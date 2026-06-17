@@ -1,6 +1,7 @@
 import {
   BadRequestException,
   Injectable,
+  NotFoundException,
 } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
@@ -13,6 +14,7 @@ import {
   TestCaseDocument,
 } from '../../db-schema/mongodb/schemas/test-case.schema';
 import { BulkUploadQuestionsDto } from './dto/bulk-upload-questions.dto';
+import { ListQuestionsQueryDto } from './dto/list-questions-query.dto';
 
 @Injectable()
 export class QuestionsService {
@@ -22,6 +24,61 @@ export class QuestionsService {
     @InjectModel(TEST_CASE_MODEL)
     private readonly testCaseModel: Model<TestCaseDocument>,
   ) {}
+
+  async findAll(query: ListQuestionsQueryDto) {
+    const page = query.page ?? 1;
+    const limit = query.limit ?? 20;
+    const filter = this.buildQuestionFilter(query);
+
+    const [items, total] = await Promise.all([
+      this.questionModel
+        .find(filter)
+        .sort({ questionId: 1 })
+        .skip((page - 1) * limit)
+        .limit(limit)
+        .select('-__v')
+        .lean(),
+      this.questionModel.countDocuments(filter),
+    ]);
+
+    return {
+      items,
+      meta: {
+        page,
+        limit,
+        total,
+        totalPages: Math.ceil(total / limit) || 0,
+      },
+    };
+  }
+
+  async findOne(questionId: number) {
+    const question = await this.questionModel
+      .findOne({ questionId })
+      .select('-__v')
+      .lean();
+
+    if (!question) {
+      throw new NotFoundException(`Question ${questionId} not found`);
+    }
+
+    const [sampleTestcases, testcaseCount] = await Promise.all([
+      this.testCaseModel
+        .find({
+          questionId,
+          $or: [{ isSample: true }, { isHidden: false }],
+        })
+        .select('-__v')
+        .lean(),
+      this.testCaseModel.countDocuments({ questionId }),
+    ]);
+
+    return {
+      ...question,
+      sampleTestcases,
+      testcaseCount,
+    };
+  }
 
   async bulkUpload(dto: BulkUploadQuestionsDto) {
     if (!dto.questions?.length && !dto.testcases?.length) {
@@ -171,5 +228,28 @@ export class QuestionsService {
     return {
       inserted: inserted.length,
     };
+  }
+
+  private buildQuestionFilter(query: ListQuestionsQueryDto) {
+    const filter: Record<string, unknown> = {};
+
+    if (query.category) {
+      filter.category = query.category;
+    }
+
+    if (query.difficulty) {
+      filter.difficulty = query.difficulty;
+    }
+
+    if (query.search) {
+      filter.$or = [
+        { title: { $regex: query.search, $options: 'i' } },
+        { category: { $regex: query.search, $options: 'i' } },
+        { pattern: { $regex: query.search, $options: 'i' } },
+        { tags: { $regex: query.search, $options: 'i' } },
+      ];
+    }
+
+    return filter;
   }
 }

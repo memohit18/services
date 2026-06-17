@@ -5,7 +5,6 @@ import {
 } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
 import { AuthGuard } from '@nestjs/passport';
-import { AccessDeniedException } from '../../common/exceptions/access-denied.exception';
 import { IS_PUBLIC_KEY } from '../decorators/public.decorator';
 
 @Injectable()
@@ -28,7 +27,7 @@ export class JwtAuthGuard extends AuthGuard('jwt') {
   }
 
   handleRequest<TUser>(err: Error | null, user: TUser, info: Error | undefined) {
-    if (err instanceof AccessDeniedException) {
+    if (err instanceof UnauthorizedException) {
       throw err;
     }
 
@@ -45,7 +44,7 @@ export class JwtAuthGuard extends AuthGuard('jwt') {
         throw new UnauthorizedException('Invalid access token');
       }
 
-      throw new AccessDeniedException();
+      throw new UnauthorizedException('Unauthorized');
     }
 
     return user;

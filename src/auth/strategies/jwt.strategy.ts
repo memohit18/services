@@ -1,8 +1,7 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, UnauthorizedException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { PassportStrategy } from '@nestjs/passport';
 import { ExtractJwt, Strategy } from 'passport-jwt';
-import { AccessDeniedException } from '../../common/exceptions/access-denied.exception';
 import { PrismaService } from '../../prisma/prisma.service';
 import type { AccessTokenPayload } from '../types/jwt-payload.type';
 
@@ -36,7 +35,7 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
     });
 
     if (!user || user.isDeleted) {
-      throw new AccessDeniedException();
+      throw new UnauthorizedException('Unauthorized');
     }
 
     return {
