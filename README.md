@@ -129,20 +129,24 @@ PostgreSQL (via Prisma) stores **users** — shared with auth-service.
 
 ## Authentication
 
-All routes require `Authorization: Bearer <token>` **except** `GET /health`.
+**This service does not expose login, signup, or token issuance.** It only validates JWT access tokens issued by **auth-service**.
 
-Get a token from auth-service:
+| Route on this service | Auth |
+|-----------------------|------|
+| `GET /health` | Public |
+| All other routes | `Authorization: Bearer <token>` required |
+
+Get a token from auth-service (separate app on port `3302`), then call this API:
 
 ```bash
+# 1. Login on auth-service (not on this service)
 curl -s -X POST http://localhost:3302/auth/login \
   -H "Content-Type: application/json" \
   -d '{"email":"your@email.com","password":"your_password"}'
-```
 
-Use the `accessToken` from the response:
-
-```bash
+# 2. Use accessToken on services API
 export TOKEN="paste_access_token_here"
+curl -s http://localhost:3303/profile -H "Authorization: Bearer $TOKEN"
 ```
 
 ---
