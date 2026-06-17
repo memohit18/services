@@ -10,6 +10,10 @@ import {
   ExampleDocument,
 } from '../../db-schema/mongodb/schemas/example.schema';
 import {
+  FOLLOW_UP_MODEL,
+  FollowUpDocument,
+} from '../../db-schema/mongodb/schemas/follow-up.schema';
+import {
   HINT_MODEL,
   HintDocument,
 } from '../../db-schema/mongodb/schemas/hint.schema';
@@ -44,6 +48,8 @@ export class QuestionsService {
     private readonly exampleModel: Model<ExampleDocument>,
     @InjectModel(HINT_MODEL)
     private readonly hintModel: Model<HintDocument>,
+    @InjectModel(FOLLOW_UP_MODEL)
+    private readonly followUpModel: Model<FollowUpDocument>,
     @InjectModel(TEST_CASE_MODEL)
     private readonly testCaseModel: Model<TestCaseDocument>,
   ) {}
@@ -81,14 +87,23 @@ export class QuestionsService {
     const question = await this.questionModel
       .findOne({ questionId })
       .select('-__v')
-      .lean();
+      .lean<QuestionSourceDocument>();
 
     if (!question) {
       throw new NotFoundException(`Question ${questionId} not found`);
     }
 
-    const [listItem, sampleTestcases, counts] = await Promise.all([
-      this.buildQuestionListResponse([question]).then((items) => items[0]),
+    const [
+      examplesByQuestionId,
+      hintsByQuestionId,
+      followUpsByQuestionId,
+      testcaseCountsByQuestionId,
+      sampleTestcases,
+    ] = await Promise.all([
+      this.getExamplesByQuestionId([questionId]),
+      this.getHintsByQuestionId([questionId]),
+      this.getFollowUpsByQuestionId([questionId]),
+      this.getTestcaseCounts([questionId]),
       this.testCaseModel
         .find({
           questionId,
@@ -96,13 +111,20 @@ export class QuestionsService {
         })
         .select('input expectedOutput isSample isHidden weight')
         .lean(),
-      this.getTestcaseCounts([questionId]).then(
-        (countMap) => countMap.get(questionId) ?? emptyTestcaseCounts(),
-      ),
     ]);
 
+    const counts =
+      testcaseCountsByQuestionId.get(questionId) ?? emptyTestcaseCounts();
+
+    const base = this.mapQuestionToListItem(question, {
+      examples: examplesByQuestionId.get(questionId) ?? [],
+      hints: hintsByQuestionId.get(questionId) ?? [],
+      followUps: followUpsByQuestionId.get(questionId) ?? [],
+      counts,
+    });
+
     return {
-      ...listItem,
+      ...base,
       sampleTestcases: sampleTestcases.map((testcase) =>
         formatTestcaseResponse(testcase),
       ),
@@ -139,8 +161,8 @@ export class QuestionsService {
         };
 
     const examplesAndHintsResult = dto.questions?.length
-      ? await this.upsertExamplesAndHints(dto.questions, questionIdMap)
-      : { examples: { inserted: 0 }, hints: { inserted: 0 } };
+      ? await this.upsertExamplesHintsAndFollowUps(dto.questions, questionIdMap)
+      : { examples: { inserted: 0 }, hints: { inserted: 0 }, followUps: { inserted: 0 } };
 
     const testcaseResult = dto.testcases?.length
       ? await this.upsertTestCases(dto.testcases, questionIdMap)
@@ -150,6 +172,7 @@ export class QuestionsService {
       questions: questionResult,
       examples: examplesAndHintsResult.examples,
       hints: examplesAndHintsResult.hints,
+      followUps: examplesAndHintsResult.followUps,
       testcases: testcaseResult,
     };
   }
@@ -212,12 +235,13 @@ export class QuestionsService {
     };
   }
 
-  private async upsertExamplesAndHints(
+  private async upsertExamplesHintsAndFollowUps(
     questions: NonNullable<BulkUploadQuestionsDto['questions']>,
     questionIdMap: Map<number, number>,
   ) {
     let examplesInserted = 0;
     let hintsInserted = 0;
+    let followUpsInserted = 0;
 
     for (const question of questions) {
       const resolvedQuestionId =
@@ -247,11 +271,24 @@ export class QuestionsService {
         );
         hintsInserted += hints.length;
       }
+
+      if (question.followUps?.length) {
+        await this.followUpModel.deleteMany({ questionId: resolvedQuestionId });
+        const followUps = await this.followUpModel.insertMany(
+          question.followUps.map((followUp, index) => ({
+            questionId: resolvedQuestionId,
+            followUp,
+            order: index,
+          })),
+        );
+        followUpsInserted += followUps.length;
+      }
     }
 
     return {
       examples: { inserted: examplesInserted },
       hints: { inserted: hintsInserted },
+      followUps: { inserted: followUpsInserted },
     };
   }
 
@@ -285,71 +322,99 @@ export class QuestionsService {
   }
 
   private normalizeQuestion(question: QuestionItemDto) {
-    const { examples: _examples, hints: _hints, ...questionData } = question;
+    const {
+      examples: _examples,
+      hints: _hints,
+      followUps: _followUps,
+      ...questionData
+    } = question;
 
-    return {
-      ...questionData,
-      followUps: question.followUps ?? [],
-    };
+    return questionData;
   }
 
   private async buildQuestionListResponse(
-    questions: Array<{
-      questionId: number;
-      title: string;
-      category: string;
-      pattern: string;
-      difficulty: string;
-      problemStatement: string;
-      constraints?: string[];
-      expectedTimeComplexity?: string;
-      expectedSpaceComplexity?: string;
-      tags?: string[];
-      followUps?: string[];
-      createdAt?: Date;
-      updatedAt?: Date;
-    }>,
+    questions: QuestionSourceDocument[],
   ): Promise<QuestionListItemResponse[]> {
     if (questions.length === 0) {
       return [];
     }
 
-    const questionIds = questions.map(
-      (question) => question.questionId as number,
-    );
+    const questionIds = questions.map((question) => question.questionId);
 
-    const [examplesByQuestionId, hintsByQuestionId, testcaseCountsByQuestionId] =
-      await Promise.all([
-        this.getExamplesByQuestionId(questionIds),
-        this.getHintsByQuestionId(questionIds),
-        this.getTestcaseCounts(questionIds),
-      ]);
+    const [
+      examplesByQuestionId,
+      hintsByQuestionId,
+      followUpsByQuestionId,
+      testcaseCountsByQuestionId,
+    ] = await Promise.all([
+      this.getExamplesByQuestionId(questionIds),
+      this.getHintsByQuestionId(questionIds),
+      this.getFollowUpsByQuestionId(questionIds),
+      this.getTestcaseCounts(questionIds),
+    ]);
 
-    return questions.map((question) => {
-      const counts =
-        testcaseCountsByQuestionId.get(question.questionId) ??
-        emptyTestcaseCounts();
-
-      return {
-        questionId: question.questionId,
-        title: question.title,
-        category: question.category,
-        pattern: question.pattern,
-        difficulty: question.difficulty,
-        problemStatement: question.problemStatement,
-        constraints: question.constraints ?? [],
-        expectedTimeComplexity: question.expectedTimeComplexity,
-        expectedSpaceComplexity: question.expectedSpaceComplexity,
-        tags: question.tags ?? [],
-        followUps: question.followUps ?? [],
+    return questions.map((question) =>
+      this.mapQuestionToListItem(question, {
         examples: examplesByQuestionId.get(question.questionId) ?? [],
         hints: hintsByQuestionId.get(question.questionId) ?? [],
-        testcaseCount: counts.testcaseCount,
-        sampleTestcaseCount: counts.sampleTestcaseCount,
-        createdAt: question.createdAt,
-        updatedAt: question.updatedAt,
-      };
-    });
+        followUps: followUpsByQuestionId.get(question.questionId) ?? [],
+        counts:
+          testcaseCountsByQuestionId.get(question.questionId) ??
+          emptyTestcaseCounts(),
+      }),
+    );
+  }
+
+  private mapQuestionToListItem(
+    question: QuestionSourceDocument,
+    related: {
+      examples: QuestionExampleResponse[];
+      hints: string[];
+      followUps: string[];
+      counts: TestcaseCounts;
+    },
+  ): QuestionListItemResponse {
+    return {
+      questionId: question.questionId,
+      title: question.title,
+      category: question.category,
+      pattern: question.pattern,
+      difficulty: question.difficulty,
+      problemStatement: question.problemStatement,
+      constraints: question.constraints ?? [],
+      expectedTimeComplexity: question.expectedTimeComplexity,
+      expectedSpaceComplexity: question.expectedSpaceComplexity,
+      tags: question.tags ?? [],
+      followUps: this.resolveFollowUps(related.followUps, question),
+      examples: this.resolveExamples(related.examples, question),
+      hints: this.resolveHints(related.hints, question),
+      testcaseCount: related.counts.testcaseCount,
+      sampleTestcaseCount: related.counts.sampleTestcaseCount,
+      createdAt: question.createdAt,
+      updatedAt: question.updatedAt,
+    };
+  }
+
+  private resolveExamples(
+    fromCollection: QuestionExampleResponse[],
+    question: QuestionSourceDocument,
+  ) {
+    return fromCollection.length > 0
+      ? fromCollection
+      : (question.examples ?? []);
+  }
+
+  private resolveHints(fromCollection: string[], question: QuestionSourceDocument) {
+    return fromCollection.length > 0 ? fromCollection : (question.hints ?? []);
+  }
+
+  private resolveFollowUps(
+    fromCollection: string[],
+    question: QuestionSourceDocument,
+  ) {
+    return fromCollection.length > 0
+      ? fromCollection
+      : (question.followUps ?? []);
   }
 
   private async getExamplesByQuestionId(questionIds: number[]) {
@@ -399,6 +464,29 @@ export class QuestionsService {
     }
 
     return hintsByQuestionId;
+  }
+
+  private async getFollowUpsByQuestionId(questionIds: number[]) {
+    const followUps = await this.followUpModel
+      .find({ questionId: { $in: questionIds } })
+      .sort({ order: 1 })
+      .select('questionId followUp')
+      .lean();
+
+    const followUpsByQuestionId = new Map<number, string[]>();
+
+    for (const questionId of questionIds) {
+      followUpsByQuestionId.set(questionId, []);
+    }
+
+    for (const followUp of followUps) {
+      const questionFollowUps = followUpsByQuestionId.get(followUp.questionId);
+      if (questionFollowUps) {
+        questionFollowUps.push(followUp.followUp);
+      }
+    }
+
+    return followUpsByQuestionId;
   }
 
   private async getTestcaseCounts(questionIds: number[]) {
@@ -476,3 +564,21 @@ export class QuestionsService {
     return filter;
   }
 }
+
+type QuestionSourceDocument = {
+  questionId: number;
+  title: string;
+  category: string;
+  pattern: string;
+  difficulty: string;
+  problemStatement: string;
+  constraints?: string[];
+  expectedTimeComplexity?: string;
+  expectedSpaceComplexity?: string;
+  tags?: string[];
+  examples?: QuestionExampleResponse[];
+  hints?: string[];
+  followUps?: string[];
+  createdAt?: Date;
+  updatedAt?: Date;
+};

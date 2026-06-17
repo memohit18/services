@@ -15,6 +15,10 @@ import {
   ExampleSchema,
 } from '../../db-schema/mongodb/schemas/example.schema';
 import {
+  FOLLOW_UP_MODEL,
+  FollowUpSchema,
+} from '../../db-schema/mongodb/schemas/follow-up.schema';
+import {
   HINT_MODEL,
   HintSchema,
 } from '../../db-schema/mongodb/schemas/hint.schema';
@@ -51,6 +55,7 @@ import {
       { name: ACTIVITY_LOG_MODEL, schema: ActivityLogSchema },
       { name: QUESTION_MODEL, schema: QuestionSchema },
       { name: EXAMPLE_MODEL, schema: ExampleSchema },
+      { name: FOLLOW_UP_MODEL, schema: FollowUpSchema },
       { name: HINT_MODEL, schema: HintSchema },
       { name: TEST_CASE_MODEL, schema: TestCaseSchema },
       { name: SUBMISSION_MODEL, schema: SubmissionSchema },

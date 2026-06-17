@@ -16,7 +16,7 @@ Authentication is handled by **auth-service** (`http://localhost:3302`). This se
 | User profile | `GET /profile` | Show logged-in user name, email, phone, avatar, role |
 | List questions | `GET /questions` | Browse/filter coding problems (category, difficulty, search) |
 | Question detail | `GET /questions/:id` | Full problem view with examples, hints, sample test cases |
-| Bulk upload | `POST /questions/bulk` | Seed or update questions, examples, hints, and test cases |
+| Bulk upload | `POST /questions/bulk` | Seed or update questions, examples, hints, follow-ups, and test cases |
 
 ---
 
@@ -111,9 +111,10 @@ Data is split across collections in the `dsa_tracker` database:
 
 | Collection | Stores | Used by |
 |------------|--------|---------|
-| `questions` | Problem metadata (title, difficulty, constraints, tags, followUps) | List + detail APIs |
+| `questions` | Problem metadata (title, difficulty, constraints, tags) | List + detail APIs |
 | `examples` | Worked examples (`input`, `output`, `explanation`) per question | List + detail APIs |
 | `hints` | Progressive hints per question | List + detail APIs |
+| `follow_ups` | Follow-up discussion prompts per question | List + detail APIs |
 | `test_cases` | Judge test cases (`input`, `expectedOutput`, `isSample`, `isHidden`) | Bulk upload + detail API |
 | `submissions` | User code submissions | Future use |
 | `user_progress` | Per-user question progress | Future use |
@@ -182,7 +183,9 @@ curl -s http://localhost:3303/profile \
 
 ### List questions — `GET /questions` (protected)
 
-Browse and filter questions. Joins data from `questions`, `examples`, `hints`, and `test_cases`.
+Browse and filter questions. Joins data from `questions`, `examples`, `hints`, `follow_ups`, and `test_cases`.
+
+> **Note:** If a question shows empty `examples`, `hints`, or `followUps`, it was uploaded without those fields. Re-run `POST /questions/bulk` with the full question payload to populate them.
 
 | Query param | Description |
 |-------------|-------------|
@@ -236,7 +239,17 @@ curl -s 'http://localhost:3303/questions?page=1&limit=10&difficulty=Easy&categor
 
 ### Question detail — `GET /questions/:questionId` (protected)
 
-Full problem for solving. Includes examples, hints, followUps, and **sample test cases only** (hidden cases are excluded).
+Full problem for solving. Fetches and joins all related data in parallel:
+
+| Source collection | Response field |
+|-------------------|----------------|
+| `questions` | Metadata, constraints, tags, complexity |
+| `examples` | `examples` |
+| `hints` | `hints` |
+| `follow_ups` | `followUps` |
+| `test_cases` | `sampleTestcases`, `testcaseCount`, `sampleTestcaseCount`, `hiddenTestcaseCount` |
+
+Hidden test case **inputs/outputs** are not returned — only `hiddenTestcaseCount`. Sample test cases (`isSample: true` or `isHidden: false`) are included in `sampleTestcases`.
 
 ```bash
 curl -s http://localhost:3303/questions/3 \
@@ -279,19 +292,21 @@ curl -s http://localhost:3303/questions/3 \
 
 ### Bulk upload — `POST /questions/bulk` (protected)
 
-Upload or update questions, examples, hints, and test cases in one request.
+Upload or update questions, examples, hints, follow-ups, and test cases in one request.
 
 #### Upsert rules
 
 | Data | Collection | Behavior |
 |------|------------|----------|
-| Questions | `questions` | Upsert by `questionId`; if **title** already exists → update that document |
+| Questions | `questions` | Upsert by `questionId`; if **title** already exists → update that document (keeps existing `questionId`) |
 | Examples | `examples` | Replace all examples for each `questionId` in payload |
 | Hints | `hints` | Replace all hints for each `questionId` in payload |
+| Follow-ups | `follow_ups` | Replace all follow-ups for each `questionId` in payload |
 | Test cases | `test_cases` | Replace all test cases for each `questionId` in payload |
-| followUps | `questions` | Stored on the question document |
 
 Test cases do **not** require the question to exist first — you can upload test cases before question metadata.
+
+`examples`, `hints`, and `followUps` are optional on each question item. If omitted or empty, existing rows in those collections are left unchanged for that question.
 
 #### Request format (recommended)
 
@@ -368,6 +383,53 @@ curl --location 'http://localhost:3303/questions/bulk' \
   --data @bulk-upload.json
 ```
 
+#### Backfill questions missing examples / hints / follow-ups
+
+Older uploads may only have question metadata and test cases. Re-upload with the same `title` to update metadata and populate related collections:
+
+```bash
+curl --location 'http://localhost:3303/questions/bulk' \
+  --header 'Content-Type: application/json' \
+  --header "Authorization: Bearer $TOKEN" \
+  --data '{
+  "questions": [
+    {
+      "questionId": 1,
+      "title": "Two Sum",
+      "category": "Arrays & Hashing",
+      "pattern": "HashMap Lookup",
+      "difficulty": "Easy",
+      "problemStatement": "Given an array of integers nums and an integer target, return indices of the two numbers such that they add up to target.",
+      "constraints": [
+        "2 <= nums.length <= 10^4",
+        "-10^9 <= nums[i] <= 10^9",
+        "Exactly one solution exists"
+      ],
+      "expectedTimeComplexity": "O(n)",
+      "expectedSpaceComplexity": "O(n)",
+      "tags": ["array", "hashmap"],
+      "examples": [
+        {
+          "input": { "nums": [2, 7, 11, 15], "target": 9 },
+          "output": [0, 1],
+          "explanation": "nums[0] + nums[1] == 9."
+        }
+      ],
+      "hints": [
+        "Use a hash map to store seen values.",
+        "For each num, check if target - num exists in the map."
+      ],
+      "followUps": [
+        "What if the array is sorted?",
+        "What if there are multiple valid pairs?"
+      ]
+    }
+  ]
+}'
+```
+
+Use `https://service.algoarena.co.in` instead of `localhost:3303` for production.
+
 **Response:**
 
 ```json
@@ -375,9 +437,28 @@ curl --location 'http://localhost:3303/questions/bulk' \
   "questions": { "upserted": 1, "modified": 0, "updatedByTitle": 0 },
   "examples": { "inserted": 1 },
   "hints": { "inserted": 2 },
+  "followUps": { "inserted": 1 },
   "testcases": { "inserted": 2, "upsertedQuestionIds": 1 }
 }
 ```
+
+#### Question fields reference
+
+| Field | Required | Description |
+|-------|----------|-------------|
+| `questionId` | Yes | Unique numeric ID |
+| `title` | Yes | Used for title-based upsert matching |
+| `category` | Yes | e.g. `Arrays & Hashing` |
+| `pattern` | Yes | e.g. `HashMap Lookup` |
+| `difficulty` | Yes | `Easy`, `Medium`, or `Hard` |
+| `problemStatement` | Yes | Full problem text |
+| `constraints` | Yes | Array of constraint strings |
+| `tags` | Yes | Array of tag strings |
+| `expectedTimeComplexity` | No | e.g. `O(n)` |
+| `expectedSpaceComplexity` | No | e.g. `O(1)` |
+| `examples` | No | `{ input, output, explanation? }[]` → saved to `examples` |
+| `hints` | No | `string[]` → saved to `hints` |
+| `followUps` | No | `string[]` → saved to `follow_ups` (interview-style extensions, e.g. “Can you solve without sorting?”) |
 
 ---
 
@@ -402,6 +483,7 @@ db-schema/
     ├── question.schema.ts    → collection: questions
     ├── example.schema.ts     → collection: examples
     ├── hint.schema.ts        → collection: hints
+    ├── follow-up.schema.ts   → collection: follow_ups
     ├── test-case.schema.ts   → collection: test_cases
     ├── submission.schema.ts  → collection: submissions
     ├── user-progress.schema.ts
@@ -442,7 +524,8 @@ docs/               # Postman collection
 | Service | Port | Purpose |
 |---------|------|---------|
 | auth-service | `3302` | Login, signup, JWT issuance |
-| services (this) | `3303` | Questions, profile, coding platform data |
+| services (this) | `3303` | Questions, profile, coding platform data (local) |
+| services (production) | `443` | `https://service.algoarena.co.in` |
 
 ---
 
