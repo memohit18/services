@@ -15,6 +15,18 @@ import {
 import { Type } from 'class-transformer';
 import { QUESTION_DIFFICULTIES } from '../../../db-schema/mongodb/schemas/question.schema';
 
+export class QuestionExampleDto {
+  @IsDefined()
+  input: Record<string, unknown>;
+
+  @IsDefined()
+  output: unknown;
+
+  @IsOptional()
+  @IsString()
+  explanation?: string;
+}
+
 export class QuestionItemDto {
   @IsInt()
   @Min(1)
@@ -54,6 +66,22 @@ export class QuestionItemDto {
   @IsArray()
   @IsString({ each: true })
   tags: string[];
+
+  @IsOptional()
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => QuestionExampleDto)
+  examples?: QuestionExampleDto[];
+
+  @IsOptional()
+  @IsArray()
+  @IsString({ each: true })
+  hints?: string[];
+
+  @IsOptional()
+  @IsArray()
+  @IsString({ each: true })
+  followUps?: string[];
 }
 
 export class TestCaseItemDto {

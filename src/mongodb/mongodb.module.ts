@@ -11,6 +11,14 @@ import {
 } from '../../db-schema/mongodb/schemas/bookmark.schema';
 import { NOTE_MODEL, NoteSchema } from '../../db-schema/mongodb/schemas/note.schema';
 import {
+  EXAMPLE_MODEL,
+  ExampleSchema,
+} from '../../db-schema/mongodb/schemas/example.schema';
+import {
+  HINT_MODEL,
+  HintSchema,
+} from '../../db-schema/mongodb/schemas/hint.schema';
+import {
   QUESTION_MODEL,
   QuestionSchema,
 } from '../../db-schema/mongodb/schemas/question.schema';
@@ -42,6 +50,8 @@ import {
     MongooseModule.forFeature([
       { name: ACTIVITY_LOG_MODEL, schema: ActivityLogSchema },
       { name: QUESTION_MODEL, schema: QuestionSchema },
+      { name: EXAMPLE_MODEL, schema: ExampleSchema },
+      { name: HINT_MODEL, schema: HintSchema },
       { name: TEST_CASE_MODEL, schema: TestCaseSchema },
       { name: SUBMISSION_MODEL, schema: SubmissionSchema },
       { name: USER_PROGRESS_MODEL, schema: UserProgressSchema },

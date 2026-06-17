@@ -6,6 +6,14 @@ import {
 import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
 import {
+  EXAMPLE_MODEL,
+  ExampleDocument,
+} from '../../db-schema/mongodb/schemas/example.schema';
+import {
+  HINT_MODEL,
+  HintDocument,
+} from '../../db-schema/mongodb/schemas/hint.schema';
+import {
   QUESTION_MODEL,
   QuestionDocument,
 } from '../../db-schema/mongodb/schemas/question.schema';
@@ -13,14 +21,29 @@ import {
   TEST_CASE_MODEL,
   TestCaseDocument,
 } from '../../db-schema/mongodb/schemas/test-case.schema';
-import { BulkUploadQuestionsDto } from './dto/bulk-upload-questions.dto';
+import {
+  BulkUploadQuestionsDto,
+  QuestionItemDto,
+} from './dto/bulk-upload-questions.dto';
 import { ListQuestionsQueryDto } from './dto/list-questions-query.dto';
+import {
+  emptyTestcaseCounts,
+  formatTestcaseResponse,
+  type QuestionDetailResponse,
+  type QuestionExampleResponse,
+  type QuestionListItemResponse,
+  type TestcaseCounts,
+} from './types/question-response.type';
 
 @Injectable()
 export class QuestionsService {
   constructor(
     @InjectModel(QUESTION_MODEL)
     private readonly questionModel: Model<QuestionDocument>,
+    @InjectModel(EXAMPLE_MODEL)
+    private readonly exampleModel: Model<ExampleDocument>,
+    @InjectModel(HINT_MODEL)
+    private readonly hintModel: Model<HintDocument>,
     @InjectModel(TEST_CASE_MODEL)
     private readonly testCaseModel: Model<TestCaseDocument>,
   ) {}
@@ -41,8 +64,10 @@ export class QuestionsService {
       this.questionModel.countDocuments(filter),
     ]);
 
+    const enrichedItems = await this.buildQuestionListResponse(items);
+
     return {
-      items,
+      items: enrichedItems,
       meta: {
         page,
         limit,
@@ -52,7 +77,7 @@ export class QuestionsService {
     };
   }
 
-  async findOne(questionId: number) {
+  async findOne(questionId: number): Promise<QuestionDetailResponse> {
     const question = await this.questionModel
       .findOne({ questionId })
       .select('-__v')
@@ -62,21 +87,26 @@ export class QuestionsService {
       throw new NotFoundException(`Question ${questionId} not found`);
     }
 
-    const [sampleTestcases, testcaseCount] = await Promise.all([
+    const [listItem, sampleTestcases, counts] = await Promise.all([
+      this.buildQuestionListResponse([question]).then((items) => items[0]),
       this.testCaseModel
         .find({
           questionId,
           $or: [{ isSample: true }, { isHidden: false }],
         })
-        .select('-__v')
+        .select('input expectedOutput isSample isHidden weight')
         .lean(),
-      this.testCaseModel.countDocuments({ questionId }),
+      this.getTestcaseCounts([questionId]).then(
+        (countMap) => countMap.get(questionId) ?? emptyTestcaseCounts(),
+      ),
     ]);
 
     return {
-      ...question,
-      sampleTestcases,
-      testcaseCount,
+      ...listItem,
+      sampleTestcases: sampleTestcases.map((testcase) =>
+        formatTestcaseResponse(testcase),
+      ),
+      hiddenTestcaseCount: counts.hiddenTestcaseCount,
     };
   }
 
@@ -101,10 +131,6 @@ export class QuestionsService {
       }
     }
 
-    if (dto.testcases?.length) {
-      await this.validateTestCaseQuestionIds(dto);
-    }
-
     const { questionResult, questionIdMap } = dto.questions?.length
       ? await this.upsertQuestions(dto.questions)
       : {
@@ -112,45 +138,20 @@ export class QuestionsService {
           questionIdMap: new Map<number, number>(),
         };
 
+    const examplesAndHintsResult = dto.questions?.length
+      ? await this.upsertExamplesAndHints(dto.questions, questionIdMap)
+      : { examples: { inserted: 0 }, hints: { inserted: 0 } };
+
     const testcaseResult = dto.testcases?.length
-      ? await this.insertTestCases(dto.testcases, questionIdMap)
-      : { inserted: 0 };
+      ? await this.upsertTestCases(dto.testcases, questionIdMap)
+      : { inserted: 0, upsertedQuestionIds: 0 };
 
     return {
       questions: questionResult,
+      examples: examplesAndHintsResult.examples,
+      hints: examplesAndHintsResult.hints,
       testcases: testcaseResult,
     };
-  }
-
-  private async validateTestCaseQuestionIds(dto: BulkUploadQuestionsDto) {
-    const payloadQuestionIds = new Set(
-      dto.questions?.map((q) => q.questionId) ?? [],
-    );
-    const testcaseQuestionIds = [
-      ...new Set(dto.testcases!.map((tc) => tc.questionId)),
-    ];
-
-    const missingIds = testcaseQuestionIds.filter(
-      (id) => !payloadQuestionIds.has(id),
-    );
-
-    if (missingIds.length === 0) {
-      return;
-    }
-
-    const existing = await this.questionModel
-      .find({ questionId: { $in: missingIds } })
-      .select('questionId')
-      .lean();
-
-    const existingIds = new Set(existing.map((q) => q.questionId));
-    const stillMissing = missingIds.filter((id) => !existingIds.has(id));
-
-    if (stillMissing.length > 0) {
-      throw new BadRequestException(
-        `Testcases reference unknown questionId(s): ${stillMissing.join(', ')}`,
-      );
-    }
   }
 
   private async upsertQuestions(
@@ -168,6 +169,7 @@ export class QuestionsService {
     let updatedByTitle = 0;
 
     const operations = questions.map((question) => {
+      const payload = this.normalizeQuestion(question);
       const existing = titleToExisting.get(question.title);
 
       if (existing) {
@@ -179,7 +181,7 @@ export class QuestionsService {
             filter: { _id: existing._id },
             update: {
               $set: {
-                ...question,
+                ...payload,
                 questionId: existing.questionId,
               },
             },
@@ -192,7 +194,7 @@ export class QuestionsService {
       return {
         updateOne: {
           filter: { questionId: question.questionId },
-          update: { $set: question },
+          update: { $set: payload },
           upsert: true,
         },
       };
@@ -210,7 +212,50 @@ export class QuestionsService {
     };
   }
 
-  private async insertTestCases(
+  private async upsertExamplesAndHints(
+    questions: NonNullable<BulkUploadQuestionsDto['questions']>,
+    questionIdMap: Map<number, number>,
+  ) {
+    let examplesInserted = 0;
+    let hintsInserted = 0;
+
+    for (const question of questions) {
+      const resolvedQuestionId =
+        questionIdMap.get(question.questionId) ?? question.questionId;
+
+      if (question.examples?.length) {
+        await this.exampleModel.deleteMany({ questionId: resolvedQuestionId });
+        const examples = await this.exampleModel.insertMany(
+          question.examples.map((example) => ({
+            questionId: resolvedQuestionId,
+            input: example.input,
+            output: example.output,
+            explanation: example.explanation,
+          })),
+        );
+        examplesInserted += examples.length;
+      }
+
+      if (question.hints?.length) {
+        await this.hintModel.deleteMany({ questionId: resolvedQuestionId });
+        const hints = await this.hintModel.insertMany(
+          question.hints.map((hint, index) => ({
+            questionId: resolvedQuestionId,
+            hint,
+            order: index,
+          })),
+        );
+        hintsInserted += hints.length;
+      }
+    }
+
+    return {
+      examples: { inserted: examplesInserted },
+      hints: { inserted: hintsInserted },
+    };
+  }
+
+  private async upsertTestCases(
     testcases: NonNullable<BulkUploadQuestionsDto['testcases']>,
     questionIdMap: Map<number, number>,
   ) {
@@ -223,11 +268,189 @@ export class QuestionsService {
       weight: testcase.weight ?? 1,
     }));
 
+    const affectedQuestionIds = [
+      ...new Set(docs.map((testcase) => testcase.questionId)),
+    ];
+
+    await this.testCaseModel.deleteMany({
+      questionId: { $in: affectedQuestionIds },
+    });
+
     const inserted = await this.testCaseModel.insertMany(docs);
 
     return {
       inserted: inserted.length,
+      upsertedQuestionIds: affectedQuestionIds.length,
     };
+  }
+
+  private normalizeQuestion(question: QuestionItemDto) {
+    const { examples: _examples, hints: _hints, ...questionData } = question;
+
+    return {
+      ...questionData,
+      followUps: question.followUps ?? [],
+    };
+  }
+
+  private async buildQuestionListResponse(
+    questions: Array<{
+      questionId: number;
+      title: string;
+      category: string;
+      pattern: string;
+      difficulty: string;
+      problemStatement: string;
+      constraints?: string[];
+      expectedTimeComplexity?: string;
+      expectedSpaceComplexity?: string;
+      tags?: string[];
+      followUps?: string[];
+      createdAt?: Date;
+      updatedAt?: Date;
+    }>,
+  ): Promise<QuestionListItemResponse[]> {
+    if (questions.length === 0) {
+      return [];
+    }
+
+    const questionIds = questions.map(
+      (question) => question.questionId as number,
+    );
+
+    const [examplesByQuestionId, hintsByQuestionId, testcaseCountsByQuestionId] =
+      await Promise.all([
+        this.getExamplesByQuestionId(questionIds),
+        this.getHintsByQuestionId(questionIds),
+        this.getTestcaseCounts(questionIds),
+      ]);
+
+    return questions.map((question) => {
+      const counts =
+        testcaseCountsByQuestionId.get(question.questionId) ??
+        emptyTestcaseCounts();
+
+      return {
+        questionId: question.questionId,
+        title: question.title,
+        category: question.category,
+        pattern: question.pattern,
+        difficulty: question.difficulty,
+        problemStatement: question.problemStatement,
+        constraints: question.constraints ?? [],
+        expectedTimeComplexity: question.expectedTimeComplexity,
+        expectedSpaceComplexity: question.expectedSpaceComplexity,
+        tags: question.tags ?? [],
+        followUps: question.followUps ?? [],
+        examples: examplesByQuestionId.get(question.questionId) ?? [],
+        hints: hintsByQuestionId.get(question.questionId) ?? [],
+        testcaseCount: counts.testcaseCount,
+        sampleTestcaseCount: counts.sampleTestcaseCount,
+        createdAt: question.createdAt,
+        updatedAt: question.updatedAt,
+      };
+    });
+  }
+
+  private async getExamplesByQuestionId(questionIds: number[]) {
+    const examples = await this.exampleModel
+      .find({ questionId: { $in: questionIds } })
+      .select('questionId input output explanation')
+      .lean();
+
+    const examplesByQuestionId = new Map<number, QuestionExampleResponse[]>();
+
+    for (const questionId of questionIds) {
+      examplesByQuestionId.set(questionId, []);
+    }
+
+    for (const example of examples) {
+      const questionExamples = examplesByQuestionId.get(example.questionId);
+      if (questionExamples) {
+        questionExamples.push({
+          input: example.input,
+          output: example.output,
+          explanation: example.explanation,
+        });
+      }
+    }
+
+    return examplesByQuestionId;
+  }
+
+  private async getHintsByQuestionId(questionIds: number[]) {
+    const hints = await this.hintModel
+      .find({ questionId: { $in: questionIds } })
+      .sort({ order: 1 })
+      .select('questionId hint')
+      .lean();
+
+    const hintsByQuestionId = new Map<number, string[]>();
+
+    for (const questionId of questionIds) {
+      hintsByQuestionId.set(questionId, []);
+    }
+
+    for (const hint of hints) {
+      const questionHints = hintsByQuestionId.get(hint.questionId);
+      if (questionHints) {
+        questionHints.push(hint.hint);
+      }
+    }
+
+    return hintsByQuestionId;
+  }
+
+  private async getTestcaseCounts(questionIds: number[]) {
+    const counts = await this.testCaseModel.aggregate<{
+      _id: number;
+      testcaseCount: number;
+      sampleTestcaseCount: number;
+      hiddenTestcaseCount: number;
+    }>([
+      { $match: { questionId: { $in: questionIds } } },
+      {
+        $group: {
+          _id: '$questionId',
+          testcaseCount: { $sum: 1 },
+          sampleTestcaseCount: {
+            $sum: {
+              $cond: [
+                {
+                  $or: [
+                    { $eq: ['$isSample', true] },
+                    { $eq: ['$isHidden', false] },
+                  ],
+                },
+                1,
+                0,
+              ],
+            },
+          },
+          hiddenTestcaseCount: {
+            $sum: {
+              $cond: [{ $eq: ['$isHidden', true] }, 1, 0],
+            },
+          },
+        },
+      },
+    ]);
+
+    const countsByQuestionId = new Map<number, TestcaseCounts>();
+
+    for (const questionId of questionIds) {
+      countsByQuestionId.set(questionId, emptyTestcaseCounts());
+    }
+
+    for (const count of counts) {
+      countsByQuestionId.set(count._id, {
+        testcaseCount: count.testcaseCount,
+        sampleTestcaseCount: count.sampleTestcaseCount,
+        hiddenTestcaseCount: count.hiddenTestcaseCount,
+      });
+    }
+
+    return countsByQuestionId;
   }
 
   private buildQuestionFilter(query: ListQuestionsQueryDto) {
