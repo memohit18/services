@@ -1,6 +1,12 @@
 # Services
 
-A [NestJS](https://nestjs.com/) backend service built with TypeScript. It shares the platform database schema via the [`db-schema`](https://github.com/memohit18/db-schema) Git submodule — the same source of truth used by `auth-service` and other APIs.
+A [NestJS](https://nestjs.com/) backend service for coding questions, test cases, and user profile data. It shares the platform database schema via the [`db-schema`](https://github.com/memohit18/db-schema) Git submodule — the same source of truth used by `auth-service` and other APIs.
+
+**Default base URL:** `http://localhost:3303`
+
+Authentication is handled by the separate **auth-service**. This service validates JWT access tokens and loads users from PostgreSQL via Prisma.
+
+---
 
 ## Prerequisites
 
@@ -8,14 +14,20 @@ A [NestJS](https://nestjs.com/) backend service built with TypeScript. It shares
 - npm
 - PostgreSQL and MongoDB (local or remote)
 - Git with SSH access to `git@github.com:memohit18/db-schema.git`
+- A running **auth-service** to obtain access tokens
 
-## Getting started
+---
 
-### 1. Clone with submodules
+## Quick start
 
 ```bash
 git clone --recurse-submodules git@github.com:memohit18/services.git
 cd services
+npm install
+cp .env.example .env   # fill in values locally
+npm run prisma:generate
+npm run prisma:migrate
+npm run start:dev
 ```
 
 If you already cloned without submodules:
@@ -24,106 +36,77 @@ If you already cloned without submodules:
 git submodule update --init --recursive
 ```
 
-### 2. Install dependencies
+---
 
-```bash
-npm install
+## Environment variables
+
+Copy `.env.example` to `.env` and set values locally. **Never commit `.env`.**
+
+| Variable | Required | Description |
+|----------|----------|-------------|
+| `PORT` | No | HTTP port (default `3303`) |
+| `DATABASE_URL` | Yes | PostgreSQL connection string (Prisma) |
+| `MONGODB_URL` | Yes | MongoDB connection string (with credentials if auth is enabled) |
+| `JWT_ACCESS_SECRET` | Yes | Must match auth-service |
+| `JWT_REFRESH_SECRET` | Yes | Must match auth-service |
+| `JWT_ACCESS_EXPIRES_IN` | No | Access token TTL (default `15m`) |
+| `JWT_REFRESH_EXPIRES_IN` | No | Refresh token TTL (default `30d`) |
+
+**MongoDB with auth example:**
+
+```env
+MONGODB_URL="mongodb://USERNAME:PASSWORD@localhost:27017/services_logs?authSource=admin"
 ```
 
-`postinstall` initializes the `db-schema` submodule and runs `prisma generate`.
+---
 
-### 3. Environment setup
+## Postman
 
-```bash
-cp .env.example .env
-```
-
-| Variable | Description | Default |
-|----------|-------------|---------|
-| `PORT` | HTTP port the server listens on | `3303` |
-| `DATABASE_URL` | PostgreSQL connection string (Prisma) | — |
-| `MONGODB_URL` | MongoDB connection string (Mongoose) | — |
-| `JWT_ACCESS_SECRET` | Access token secret (must match auth-service) | — |
-| `JWT_REFRESH_SECRET` | Refresh token secret (must match auth-service) | — |
-| `JWT_ACCESS_EXPIRES_IN` | Access token TTL | `15m` |
-| `JWT_REFRESH_EXPIRES_IN` | Refresh token TTL | `30d` |
-
-Set these in your local `.env` only — never commit real values.
-
-### 4. Database setup
-
-**PostgreSQL (Prisma)** — schema lives in the submodule:
-
-```bash
-npm run prisma:generate
-npm run prisma:migrate
-```
-
-**MongoDB (Mongoose)** — schemas are imported from `db-schema/mongodb/schemas/`. Collections are created when the service connects and writes.
-
-### 5. Run the application
-
-```bash
-npm run start:dev
-```
-
-The server starts at **http://localhost:3303** by default.
-
-## Shared database schema (`db-schema` submodule)
+Import the collection:
 
 ```
-db-schema/                          # git submodule
-├── postgres/prisma/
-│   ├── schema.prisma               # PostgreSQL models (User, Session, etc.)
-│   └── migrations/                 # Prisma migration history
-└── mongodb/schemas/
-    └── activity-log.schema.ts      # Mongoose schemas for NestJS
+docs/services.postman_collection.json
 ```
 
-This repo does **not** own the schema. Changes are made in [memohit18/db-schema](https://github.com/memohit18/db-schema) and pulled into services:
+Set the `accessToken` collection variable with a JWT from auth-service. All protected requests use `Authorization: Bearer {{accessToken}}`.
 
-```bash
-npm run submodule:pull
-npm run prisma:generate
-```
-
-See `db-schema/README.md` for full schema documentation.
-
-## Project structure
-
-```
-src/
-├── main.ts
-├── app.module.ts
-├── auth/
-│   ├── auth.module.ts              # Global JWT guard + auth middleware
-│   ├── guards/jwt-auth.guard.ts
-│   ├── strategies/jwt.strategy.ts  # Prisma user validation
-│   └── middleware/auth.middleware.ts
-├── common/
-│   └── filters/global-exception.filter.ts
-├── config/
-│   └── configuration.ts
-├── health/
-│   ├── health.module.ts
-│   ├── health.controller.ts        # GET /health
-│   └── health.service.ts
-├── prisma/
-│   ├── prisma.module.ts            # Global Prisma client (PostgreSQL)
-│   └── prisma.service.ts
-└── mongodb/
-    └── mongodb.module.ts           # Mongoose connection + shared schemas
-db-schema/                          # Submodule — shared schema for all services
-prisma.config.ts                    # Prisma CLI config (schema path, migrations)
-```
+---
 
 ## API
 
-### Health check
+### Authentication
 
-`GET /health` — returns API status, database connectivity, and uptime.
+All routes require a valid Bearer access token **except** `GET /health`.
 
-**200 OK** when all checks pass:
+Tokens are issued by **auth-service** (e.g. `POST /auth/login` on port `3302`). This service:
+
+1. Verifies the JWT with `JWT_ACCESS_SECRET`
+2. Loads the user from PostgreSQL via Prisma
+3. Returns **401 Unauthorized** if the token is missing, invalid, expired, or the user does not exist / is deleted
+
+```
+Authorization: Bearer <access_token>
+```
+
+**401 response shape:**
+
+```json
+{
+  "statusCode": 401,
+  "error": "Unauthorized",
+  "message": "Invalid access token",
+  "path": "/profile",
+  "timestamp": "2026-06-17T12:00:00.000Z"
+}
+```
+
+---
+
+### Health
+
+`GET /health` — public, no auth.
+
+**200** when API, PostgreSQL, and MongoDB are healthy:
 
 ```json
 {
@@ -133,89 +116,190 @@ prisma.config.ts                    # Prisma CLI config (schema path, migrations
     "postgres": { "status": "ok" },
     "mongodb": { "status": "ok" }
   },
-  "uptime": {
-    "seconds": 42.15,
-    "formatted": "42s"
-  }
+  "uptime": { "seconds": 42.15, "formatted": "42s" }
 }
 ```
 
-**503 Service Unavailable** when PostgreSQL or MongoDB is unreachable (same body shape with `"status": "error"`).
+**503** when a database check fails.
 
-### Authentication
+---
 
-All routes require a valid Bearer access token **except** `GET /health`.
+### Profile
 
-The global `JwtAuthGuard` verifies the JWT using `JWT_ACCESS_SECRET`, then loads the user from PostgreSQL via Prisma. Access is denied if:
+`GET /profile` — protected.
 
-- The token is missing, invalid, or expired
-- The user does not exist in the database
-- The user is marked as deleted (`isDeleted: true`)
-
-**401 Unauthorized** — invalid or expired token:
+Returns the authenticated user's profile from PostgreSQL:
 
 ```json
 {
-  "statusCode": 401,
-  "error": "Unauthorized",
-  "message": "Invalid access token",
-  "path": "/example",
-  "timestamp": "2026-06-17T12:00:00.000Z"
+  "name": "Mohit Kumar",
+  "email": "user@example.com",
+  "phone": "+919876543210",
+  "avatar": "https://...",
+  "role": "user"
 }
 ```
 
-**403 Forbidden** — token valid but user not allowed:
+```bash
+curl -s http://localhost:3303/profile \
+  -H "Authorization: Bearer YOUR_ACCESS_TOKEN"
+```
+
+---
+
+### Questions
+
+#### List questions
+
+`GET /questions` — protected.
+
+| Query param | Description |
+|-------------|-------------|
+| `page` | Page number (default `1`) |
+| `limit` | Items per page (default `20`, max `100`) |
+| `category` | Filter by category |
+| `difficulty` | `Easy`, `Medium`, or `Hard` |
+| `search` | Search title, category, pattern, tags |
+
+```bash
+curl -s 'http://localhost:3303/questions?page=1&limit=10&difficulty=Easy' \
+  -H "Authorization: Bearer YOUR_ACCESS_TOKEN"
+```
+
+**Response:**
 
 ```json
 {
-  "statusCode": 403,
-  "error": "Forbidden",
-  "message": "Access denied",
-  "path": "/example",
-  "timestamp": "2026-06-17T12:00:00.000Z"
+  "items": [ { "questionId": 1, "title": "Two Sum", "..." : "..." } ],
+  "meta": { "page": 1, "limit": 10, "total": 2, "totalPages": 1 }
 }
 ```
 
-Send requests with:
+#### Question detail
+
+`GET /questions/:questionId` — protected.
+
+Returns the full question plus **sample test cases only** (hidden cases excluded):
+
+```json
+{
+  "questionId": 1,
+  "title": "Two Sum",
+  "problemStatement": "...",
+  "sampleTestcases": [ "..." ],
+  "testcaseCount": 3
+}
+```
+
+```bash
+curl -s http://localhost:3303/questions/1 \
+  -H "Authorization: Bearer YOUR_ACCESS_TOKEN"
+```
+
+#### Bulk upload
+
+`POST /questions/bulk` — protected.
+
+Upload questions and test cases to MongoDB in one request.
+
+- Questions are upserted by `questionId`
+- If a question with the same **title** already exists, it is updated (existing `questionId` is kept)
+- Test cases are appended; payload `questionId` values are mapped to the resolved DB `questionId`
+
+**Response:**
+
+```json
+{
+  "questions": { "upserted": 2, "modified": 0, "updatedByTitle": 0 },
+  "testcases": { "inserted": 3 }
+}
+```
+
+---
+
+## Shared database schema (`db-schema` submodule)
 
 ```
-Authorization: Bearer <access_token>
+db-schema/
+├── postgres/prisma/
+│   ├── schema.prisma          # User, Session, RefreshToken
+│   └── migrations/
+└── mongodb/schemas/
+    ├── question.schema.ts
+    ├── test-case.schema.ts
+    ├── submission.schema.ts
+    ├── user-progress.schema.ts
+    ├── note.schema.ts
+    ├── bookmark.schema.ts
+    └── activity-log.schema.ts
 ```
+
+Schema changes are made in [memohit18/db-schema](https://github.com/memohit18/db-schema):
+
+```bash
+npm run submodule:pull
+npm run prisma:generate
+```
+
+See `db-schema/README.md` for full documentation.
+
+---
+
+## Project structure
+
+```
+src/
+├── main.ts
+├── app.module.ts
+├── auth/
+│   ├── auth.module.ts              # Global JWT guard + middleware
+│   ├── guards/jwt-auth.guard.ts
+│   ├── strategies/jwt.strategy.ts  # JWT verify + Prisma user lookup
+│   └── middleware/auth.middleware.ts
+├── common/
+│   ├── decorators/current-user.decorator.ts
+│   └── filters/global-exception.filter.ts
+├── config/
+│   └── configuration.ts
+├── health/
+├── profile/                        # GET /profile
+├── questions/                      # Questions CRUD + bulk upload
+├── prisma/                         # PostgreSQL (Prisma)
+└── mongodb/                        # MongoDB (Mongoose)
+docs/
+└── services.postman_collection.json
+db-schema/                          # Git submodule
+prisma.config.ts
+```
+
+---
 
 ## Scripts
 
 | Script | Description |
 |--------|-------------|
-| `npm run start` | Start the app (loads `.env`) |
 | `npm run start:dev` | Start in watch mode |
+| `npm run start` | Start (single run) |
 | `npm run start:prod` | Run compiled build |
-| `npm run build` | Compile TypeScript (`prisma generate` runs first) |
+| `npm run build` | Compile (`prisma generate` runs first) |
 | `npm run submodule:init` | Initialize `db-schema` submodule |
-| `npm run submodule:pull` | Pull latest `db-schema` from remote |
-| `npm run prisma:generate` | Generate Prisma client from submodule schema |
-| `npm run prisma:migrate` | Create/apply migrations (development) |
-| `npm run prisma:migrate:deploy` | Apply migrations (staging/production) |
+| `npm run submodule:pull` | Pull latest `db-schema` |
+| `npm run prisma:generate` | Generate Prisma client |
+| `npm run prisma:migrate` | Create/apply migrations (dev) |
+| `npm run prisma:migrate:deploy` | Apply migrations (prod) |
 | `npm run lint` | Lint source files |
+| `npm run format` | Format source files |
 
-## Using Prisma and MongoDB in code
+---
 
-**PostgreSQL** — inject `PrismaService`:
+## Related services
 
-```typescript
-constructor(private readonly prisma: PrismaService) {}
+| Service | Port | Purpose |
+|---------|------|---------|
+| **auth-service** | `3302` | Login, signup, token issuance |
+| **services** (this) | `3303` | Questions, profile, coding platform data |
 
-await this.prisma.user.findMany();
-```
-
-**MongoDB** — import models from the submodule and use `@InjectModel()`:
-
-```typescript
-import { ACTIVITY_LOG_MODEL } from '../../db-schema/mongodb/schemas/activity-log.schema';
-
-constructor(
-  @InjectModel(ACTIVITY_LOG_MODEL) private activityLogModel: Model<ActivityLogDocument>,
-) {}
-```
+---
 
 ## Learn more
 
