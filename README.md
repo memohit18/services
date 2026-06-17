@@ -1,33 +1,47 @@
 # Services
 
-A [NestJS](https://nestjs.com/) backend service for coding questions, test cases, and user profile data. It shares the platform database schema via the [`db-schema`](https://github.com/memohit18/db-schema) Git submodule — the same source of truth used by `auth-service` and other APIs.
+A [NestJS](https://nestjs.com/) backend for the coding platform — questions, test cases, examples, hints, and user profile. It shares the platform database schema via the [`db-schema`](https://github.com/memohit18/db-schema) Git submodule (same source of truth as `auth-service`).
 
 **Default base URL:** `http://localhost:3303`
 
-Authentication is handled by the separate **auth-service**. This service validates JWT access tokens and loads users from PostgreSQL via Prisma.
+Authentication is handled by **auth-service** (`http://localhost:3302`). This service only validates JWT access tokens and loads users from PostgreSQL.
+
+---
+
+## What this service does
+
+| Feature | Endpoint | Use case |
+|---------|----------|----------|
+| Health check | `GET /health` | Monitor API + PostgreSQL + MongoDB (load balancers, deploys) |
+| User profile | `GET /profile` | Show logged-in user name, email, phone, avatar, role |
+| List questions | `GET /questions` | Browse/filter coding problems (category, difficulty, search) |
+| Question detail | `GET /questions/:id` | Full problem view with examples, hints, sample test cases |
+| Bulk upload | `POST /questions/bulk` | Seed or update questions, examples, hints, and test cases |
 
 ---
 
 ## Prerequisites
 
-- [Node.js](https://nodejs.org/) (v20 or later recommended)
+- Node.js v20+
 - npm
-- PostgreSQL and MongoDB (local or remote)
-- Git with SSH access to `git@github.com:memohit18/db-schema.git`
-- A running **auth-service** to obtain access tokens
+- PostgreSQL (users via Prisma — shared with auth-service)
+- MongoDB database `dsa_tracker` (or your own DB name in `MONGODB_URL`)
+- Git SSH access to `git@github.com:memohit18/db-schema.git`
+- Running **auth-service** for JWT tokens
 
 ---
 
-## Quick start
+## Commands to run the project
+
+### First-time setup
 
 ```bash
 git clone --recurse-submodules git@github.com:memohit18/services.git
 cd services
 npm install
-cp .env.example .env   # fill in values locally
+cp .env.example .env          # fill in values locally — never commit .env
 npm run prisma:generate
 npm run prisma:migrate
-npm run start:dev
 ```
 
 If you already cloned without submodules:
@@ -36,99 +50,123 @@ If you already cloned without submodules:
 git submodule update --init --recursive
 ```
 
+### Development (hot reload)
+
+```bash
+npm run start:dev
+```
+
+Server runs at **http://localhost:3303**.
+
+### Other commands
+
+| Command | When to use |
+|---------|-------------|
+| `npm run start` | Single run (no watch) |
+| `npm run start:debug` | Debug with inspector |
+| `npm run build` | Compile TypeScript to `dist/` |
+| `npm run start:prod` | Run production build |
+| `npm run prisma:generate` | Regenerate Prisma client after schema changes |
+| `npm run prisma:migrate` | Apply DB migrations (development) |
+| `npm run prisma:migrate:deploy` | Apply migrations (staging/production) |
+| `npm run submodule:pull` | Pull latest `db-schema` from remote |
+| `npm run lint` | Lint source files |
+| `npm run format` | Format source files |
+
+### Production deploy
+
+```bash
+npm install
+npm run submodule:init
+npm run prisma:migrate:deploy
+npm run build
+npm run start:prod
+```
+
 ---
 
 ## Environment variables
 
-Copy `.env.example` to `.env` and set values locally. **Never commit `.env`.**
+Copy `.env.example` to `.env` and set values locally.
 
 | Variable | Required | Description |
 |----------|----------|-------------|
 | `PORT` | No | HTTP port (default `3303`) |
-| `DATABASE_URL` | Yes | PostgreSQL connection string (Prisma) |
-| `MONGODB_URL` | Yes | MongoDB connection string (with credentials if auth is enabled) |
+| `DATABASE_URL` | Yes | PostgreSQL connection string |
+| `MONGODB_URL` | Yes | MongoDB connection string |
 | `JWT_ACCESS_SECRET` | Yes | Must match auth-service |
 | `JWT_REFRESH_SECRET` | Yes | Must match auth-service |
-| `JWT_ACCESS_EXPIRES_IN` | No | Access token TTL (default `15m`) |
-| `JWT_REFRESH_EXPIRES_IN` | No | Refresh token TTL (default `30d`) |
-
-**MongoDB with auth example:**
+| `JWT_ACCESS_EXPIRES_IN` | No | Default `15m` |
+| `JWT_REFRESH_EXPIRES_IN` | No | Default `30d` |
 
 ```env
-MONGODB_URL="mongodb://USERNAME:PASSWORD@localhost:27017/services_logs?authSource=admin"
+MONGODB_URL="mongodb://USERNAME:PASSWORD@localhost:27017/dsa_tracker?authSource=admin"
 ```
 
 ---
 
-## Postman
+## MongoDB collections
 
-Import the collection:
+Data is split across collections in the `dsa_tracker` database:
 
-```
-docs/services.postman_collection.json
-```
+| Collection | Stores | Used by |
+|------------|--------|---------|
+| `questions` | Problem metadata (title, difficulty, constraints, tags, followUps) | List + detail APIs |
+| `examples` | Worked examples (`input`, `output`, `explanation`) per question | List + detail APIs |
+| `hints` | Progressive hints per question | List + detail APIs |
+| `test_cases` | Judge test cases (`input`, `expectedOutput`, `isSample`, `isHidden`) | Bulk upload + detail API |
+| `submissions` | User code submissions | Future use |
+| `user_progress` | Per-user question progress | Future use |
+| `bookmarks` | Saved questions | Future use |
+| `notes` | User notes per question | Future use |
+| `activity_logs` | Activity audit trail | Future use |
 
-Set the `accessToken` collection variable with a JWT from auth-service. All protected requests use `Authorization: Bearer {{accessToken}}`.
-
----
-
-## API
-
-### Authentication
-
-All routes require a valid Bearer access token **except** `GET /health`.
-
-Tokens are issued by **auth-service** (e.g. `POST /auth/login` on port `3302`). This service:
-
-1. Verifies the JWT with `JWT_ACCESS_SECRET`
-2. Loads the user from PostgreSQL via Prisma
-3. Returns **401 Unauthorized** if the token is missing, invalid, expired, or the user does not exist / is deleted
-
-```
-Authorization: Bearer <access_token>
-```
-
-**401 response shape:**
-
-```json
-{
-  "statusCode": 401,
-  "error": "Unauthorized",
-  "message": "Invalid access token",
-  "path": "/profile",
-  "timestamp": "2026-06-17T12:00:00.000Z"
-}
-```
+PostgreSQL (via Prisma) stores **users** — shared with auth-service.
 
 ---
 
-### Health
+## Authentication
 
-`GET /health` — public, no auth.
+All routes require `Authorization: Bearer <token>` **except** `GET /health`.
 
-**200** when API, PostgreSQL, and MongoDB are healthy:
+Get a token from auth-service:
 
-```json
-{
-  "status": "ok",
-  "api": { "status": "ok" },
-  "db": {
-    "postgres": { "status": "ok" },
-    "mongodb": { "status": "ok" }
-  },
-  "uptime": { "seconds": 42.15, "formatted": "42s" }
-}
+```bash
+curl -s -X POST http://localhost:3302/auth/login \
+  -H "Content-Type: application/json" \
+  -d '{"email":"your@email.com","password":"your_password"}'
 ```
 
-**503** when a database check fails.
+Use the `accessToken` from the response:
+
+```bash
+export TOKEN="paste_access_token_here"
+```
 
 ---
 
-### Profile
+## API reference
 
-`GET /profile` — protected.
+### Health — `GET /health` (public)
 
-Returns the authenticated user's profile from PostgreSQL:
+Check API, PostgreSQL, and MongoDB status.
+
+```bash
+curl -s http://localhost:3303/health
+```
+
+---
+
+### Profile — `GET /profile` (protected)
+
+Returns the logged-in user's profile from PostgreSQL.
+
+```bash
+curl -s http://localhost:3303/profile \
+  -H "Authorization: Bearer $TOKEN"
+```
+
+**Response:**
 
 ```json
 {
@@ -140,80 +178,218 @@ Returns the authenticated user's profile from PostgreSQL:
 }
 ```
 
-```bash
-curl -s http://localhost:3303/profile \
-  -H "Authorization: Bearer YOUR_ACCESS_TOKEN"
-```
-
 ---
 
-### Questions
+### List questions — `GET /questions` (protected)
 
-#### List questions
-
-`GET /questions` — protected.
+Browse and filter questions. Joins data from `questions`, `examples`, `hints`, and `test_cases`.
 
 | Query param | Description |
 |-------------|-------------|
 | `page` | Page number (default `1`) |
-| `limit` | Items per page (default `20`, max `100`) |
-| `category` | Filter by category |
-| `difficulty` | `Easy`, `Medium`, or `Hard` |
-| `search` | Search title, category, pattern, tags |
+| `limit` | Per page (default `20`, max `100`) |
+| `category` | e.g. `Arrays & Hashing` |
+| `difficulty` | `Easy`, `Medium`, `Hard` |
+| `search` | Matches title, category, pattern, tags |
 
 ```bash
-curl -s 'http://localhost:3303/questions?page=1&limit=10&difficulty=Easy' \
-  -H "Authorization: Bearer YOUR_ACCESS_TOKEN"
+curl -s 'http://localhost:3303/questions?page=1&limit=10&difficulty=Easy&category=Arrays%20%26%20Hashing' \
+  -H "Authorization: Bearer $TOKEN"
 ```
 
 **Response:**
 
 ```json
 {
-  "items": [ { "questionId": 1, "title": "Two Sum", "..." : "..." } ],
-  "meta": { "page": 1, "limit": 10, "total": 2, "totalPages": 1 }
+  "items": [
+    {
+      "questionId": 3,
+      "title": "Valid Anagram",
+      "category": "Arrays & Hashing",
+      "pattern": "Frequency Count",
+      "difficulty": "Easy",
+      "problemStatement": "Given two strings s and t...",
+      "constraints": ["1 <= s.length <= 50000"],
+      "expectedTimeComplexity": "O(n)",
+      "expectedSpaceComplexity": "O(1)",
+      "tags": ["string", "hashmap"],
+      "followUps": ["Can you solve without sorting?"],
+      "examples": [
+        {
+          "input": { "s": "anagram", "t": "nagaram" },
+          "output": true,
+          "explanation": "Both strings contain the same character frequencies."
+        }
+      ],
+      "hints": ["Count character frequencies.", "Compare both frequency maps."],
+      "testcaseCount": 2,
+      "sampleTestcaseCount": 1,
+      "createdAt": "2026-06-17T...",
+      "updatedAt": "2026-06-17T..."
+    }
+  ],
+  "meta": { "page": 1, "limit": 10, "total": 8, "totalPages": 1 }
 }
 ```
 
-#### Question detail
+---
 
-`GET /questions/:questionId` — protected.
+### Question detail — `GET /questions/:questionId` (protected)
 
-Returns the full question plus **sample test cases only** (hidden cases excluded):
+Full problem for solving. Includes examples, hints, followUps, and **sample test cases only** (hidden cases are excluded).
+
+```bash
+curl -s http://localhost:3303/questions/3 \
+  -H "Authorization: Bearer $TOKEN"
+```
+
+**Response:**
 
 ```json
 {
-  "questionId": 1,
-  "title": "Two Sum",
+  "questionId": 3,
+  "title": "Valid Anagram",
+  "category": "Arrays & Hashing",
+  "pattern": "Frequency Count",
+  "difficulty": "Easy",
   "problemStatement": "...",
-  "sampleTestcases": [ "..." ],
-  "testcaseCount": 3
+  "constraints": ["..."],
+  "expectedTimeComplexity": "O(n)",
+  "expectedSpaceComplexity": "O(1)",
+  "tags": ["string", "hashmap"],
+  "followUps": ["..."],
+  "examples": [{ "input": {}, "output": true, "explanation": "..." }],
+  "hints": ["Count character frequencies."],
+  "testcaseCount": 2,
+  "sampleTestcaseCount": 1,
+  "hiddenTestcaseCount": 1,
+  "sampleTestcases": [
+    {
+      "input": { "s": "anagram", "t": "nagaram" },
+      "expectedOutput": true,
+      "isSample": true,
+      "isHidden": false,
+      "weight": 1
+    }
+  ]
 }
 ```
 
+---
+
+### Bulk upload — `POST /questions/bulk` (protected)
+
+Upload or update questions, examples, hints, and test cases in one request.
+
+#### Upsert rules
+
+| Data | Collection | Behavior |
+|------|------------|----------|
+| Questions | `questions` | Upsert by `questionId`; if **title** already exists → update that document |
+| Examples | `examples` | Replace all examples for each `questionId` in payload |
+| Hints | `hints` | Replace all hints for each `questionId` in payload |
+| Test cases | `test_cases` | Replace all test cases for each `questionId` in payload |
+| followUps | `questions` | Stored on the question document |
+
+Test cases do **not** require the question to exist first — you can upload test cases before question metadata.
+
+#### Request format (recommended)
+
 ```bash
-curl -s http://localhost:3303/questions/1 \
-  -H "Authorization: Bearer YOUR_ACCESS_TOKEN"
+curl --location 'http://localhost:3303/questions/bulk' \
+  --header 'Content-Type: application/json' \
+  --header "Authorization: Bearer $TOKEN" \
+  --data '{
+  "questions": [
+    {
+      "questionId": 3,
+      "title": "Valid Anagram",
+      "category": "Arrays & Hashing",
+      "pattern": "Frequency Count",
+      "difficulty": "Easy",
+      "problemStatement": "Given two strings s and t, return true if t is an anagram of s.",
+      "constraints": ["1 <= s.length <= 50000"],
+      "expectedTimeComplexity": "O(n)",
+      "expectedSpaceComplexity": "O(1)",
+      "tags": ["string", "hashmap"],
+      "examples": [
+        {
+          "input": { "s": "anagram", "t": "nagaram" },
+          "output": true,
+          "explanation": "Both strings contain the same character frequencies."
+        }
+      ],
+      "hints": ["Count character frequencies.", "Compare both frequency maps."],
+      "followUps": ["Can you solve without sorting?"]
+    }
+  ],
+  "testcases": [
+    {
+      "questionId": 3,
+      "input": { "s": "anagram", "t": "nagaram" },
+      "expectedOutput": true,
+      "isSample": true,
+      "isHidden": false
+    },
+    {
+      "questionId": 3,
+      "input": { "s": "rat", "t": "car" },
+      "expectedOutput": false,
+      "isSample": false,
+      "isHidden": true
+    }
+  ]
+}'
 ```
 
-#### Bulk upload
+#### Testcases-only (bare array also accepted)
 
-`POST /questions/bulk` — protected.
+```bash
+curl --location 'http://localhost:3303/questions/bulk' \
+  --header 'Content-Type: application/json' \
+  --header "Authorization: Bearer $TOKEN" \
+  --data '[
+    {
+      "questionId": 3,
+      "input": { "s": "anagram", "t": "nagaram" },
+      "expectedOutput": true,
+      "isSample": true,
+      "isHidden": false
+    }
+  ]'
+```
 
-Upload questions and test cases to MongoDB in one request.
+Or upload from a file:
 
-- Questions are upserted by `questionId`
-- If a question with the same **title** already exists, it is updated (existing `questionId` is kept)
-- Test cases are appended; payload `questionId` values are mapped to the resolved DB `questionId`
+```bash
+curl --location 'http://localhost:3303/questions/bulk' \
+  --header 'Content-Type: application/json' \
+  --header "Authorization: Bearer $TOKEN" \
+  --data @bulk-upload.json
+```
 
 **Response:**
 
 ```json
 {
-  "questions": { "upserted": 2, "modified": 0, "updatedByTitle": 0 },
-  "testcases": { "inserted": 3 }
+  "questions": { "upserted": 1, "modified": 0, "updatedByTitle": 0 },
+  "examples": { "inserted": 1 },
+  "hints": { "inserted": 2 },
+  "testcases": { "inserted": 2, "upsertedQuestionIds": 1 }
 }
 ```
+
+---
+
+## Postman
+
+Import:
+
+```
+docs/services.postman_collection.json
+```
+
+Set the `accessToken` collection variable with your JWT from auth-service.
 
 ---
 
@@ -221,27 +397,25 @@ Upload questions and test cases to MongoDB in one request.
 
 ```
 db-schema/
-├── postgres/prisma/
-│   ├── schema.prisma          # User, Session, RefreshToken
-│   └── migrations/
+├── postgres/prisma/          # User, Session, RefreshToken
 └── mongodb/schemas/
-    ├── question.schema.ts
-    ├── test-case.schema.ts
-    ├── submission.schema.ts
+    ├── question.schema.ts    → collection: questions
+    ├── example.schema.ts     → collection: examples
+    ├── hint.schema.ts        → collection: hints
+    ├── test-case.schema.ts   → collection: test_cases
+    ├── submission.schema.ts  → collection: submissions
     ├── user-progress.schema.ts
     ├── note.schema.ts
     ├── bookmark.schema.ts
     └── activity-log.schema.ts
 ```
 
-Schema changes are made in [memohit18/db-schema](https://github.com/memohit18/db-schema):
+After pulling schema updates:
 
 ```bash
 npm run submodule:pull
 npm run prisma:generate
 ```
-
-See `db-schema/README.md` for full documentation.
 
 ---
 
@@ -249,46 +423,17 @@ See `db-schema/README.md` for full documentation.
 
 ```
 src/
-├── main.ts
-├── app.module.ts
-├── auth/
-│   ├── auth.module.ts              # Global JWT guard + middleware
-│   ├── guards/jwt-auth.guard.ts
-│   ├── strategies/jwt.strategy.ts  # JWT verify + Prisma user lookup
-│   └── middleware/auth.middleware.ts
-├── common/
-│   ├── decorators/current-user.decorator.ts
-│   └── filters/global-exception.filter.ts
-├── config/
-│   └── configuration.ts
-├── health/
-├── profile/                        # GET /profile
-├── questions/                      # Questions CRUD + bulk upload
-├── prisma/                         # PostgreSQL (Prisma)
-└── mongodb/                        # MongoDB (Mongoose)
-docs/
-└── services.postman_collection.json
-db-schema/                          # Git submodule
-prisma.config.ts
+├── auth/           # Global JWT guard + middleware
+├── common/         # Exception filter, current-user decorator
+├── config/         # Environment configuration
+├── health/         # GET /health
+├── profile/        # GET /profile
+├── questions/      # List, detail, bulk upload
+├── prisma/         # PostgreSQL client
+└── mongodb/        # MongoDB connection + schema registration
+db-schema/          # Git submodule (shared schemas)
+docs/               # Postman collection
 ```
-
----
-
-## Scripts
-
-| Script | Description |
-|--------|-------------|
-| `npm run start:dev` | Start in watch mode |
-| `npm run start` | Start (single run) |
-| `npm run start:prod` | Run compiled build |
-| `npm run build` | Compile (`prisma generate` runs first) |
-| `npm run submodule:init` | Initialize `db-schema` submodule |
-| `npm run submodule:pull` | Pull latest `db-schema` |
-| `npm run prisma:generate` | Generate Prisma client |
-| `npm run prisma:migrate` | Create/apply migrations (dev) |
-| `npm run prisma:migrate:deploy` | Apply migrations (prod) |
-| `npm run lint` | Lint source files |
-| `npm run format` | Format source files |
 
 ---
 
@@ -296,8 +441,8 @@ prisma.config.ts
 
 | Service | Port | Purpose |
 |---------|------|---------|
-| **auth-service** | `3302` | Login, signup, token issuance |
-| **services** (this) | `3303` | Questions, profile, coding platform data |
+| auth-service | `3302` | Login, signup, JWT issuance |
+| services (this) | `3303` | Questions, profile, coding platform data |
 
 ---
 
