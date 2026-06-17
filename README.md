@@ -14,7 +14,8 @@ Authentication is handled by **auth-service** (`http://localhost:3302`). This se
 |---------|----------|----------|
 | Health check | `GET /health` | Monitor API + PostgreSQL + MongoDB (load balancers, deploys) |
 | User profile | `GET /profile` | Show logged-in user name, email, phone, avatar, role |
-| List questions | `GET /questions` | Browse/filter coding problems (category, difficulty, search) |
+| List questions | `GET /questions` | Browse/filter by category, difficulty, tags, search |
+| Question filters | `GET /questions/filters` | Available categories, tags, difficulties for filter UI |
 | Question detail | `GET /questions/:id` | Full problem view with examples, hints, sample test cases |
 | Bulk upload | `POST /questions/bulk` | Seed or update questions, examples, hints, follow-ups, and test cases |
 
@@ -185,22 +186,59 @@ curl -s http://localhost:3303/profile \
 
 Browse and filter questions. Joins data from `questions`, `examples`, `hints`, `follow_ups`, and `test_cases`.
 
-> **Note:** If a question shows empty `examples`, `hints`, or `followUps`, it was uploaded without those fields. Re-run `POST /questions/bulk` with the full question payload to populate them.
-
 | Query param | Description |
 |-------------|-------------|
 | `page` | Page number (default `1`) |
 | `limit` | Per page (default `20`, max `100`) |
-| `category` | e.g. `Arrays & Hashing` |
-| `difficulty` | `Easy`, `Medium`, `Hard` |
+| `category` | Exact match, e.g. `Arrays & Hashing` |
+| `difficulty` | `Easy`, `Medium`, or `Hard` |
+| `tags` | Comma-separated tags (matches any), e.g. `array,hashmap` |
 | `search` | Matches title, category, pattern, tags |
 
+Filters can be combined, e.g. `category` + `difficulty` + `tags`. The response includes:
+
+- `items` — paginated questions
+- `meta.appliedFilters` — echo of the filters used in the request
+- `filters` — all available `categories`, `tags`, and `difficulties` for filter UI dropdowns
+
 ```bash
-curl -s 'http://localhost:3303/questions?page=1&limit=10&difficulty=Easy&category=Arrays%20%26%20Hashing' \
+curl -s 'http://localhost:3303/questions?page=1&limit=10&difficulty=Easy&category=Arrays%20%26%20Hashing&tags=array,hashmap' \
+  -H "Authorization: Bearer $TOKEN"
+```
+
+---
+
+### Question filters — `GET /questions/filters` (protected)
+
+Returns distinct values from the database for building filter dropdowns in the UI.
+
+```bash
+curl -s http://localhost:3303/questions/filters \
   -H "Authorization: Bearer $TOKEN"
 ```
 
 **Response:**
+
+```json
+{
+  "categories": ["Arrays & Hashing"],
+  "tags": ["array", "bucket-sort", "hashmap", "heap", "prefix", "set", "sorting", "string", "suffix", "voting"],
+  "difficulties": ["Easy", "Medium", "Hard"]
+}
+```
+
+Production:
+
+```bash
+curl -s https://service.algoarena.co.in/questions/filters \
+  -H "Authorization: Bearer $TOKEN"
+```
+
+---
+
+### List questions — example response
+
+> **Note:** If a question shows empty `examples`, `hints`, or `followUps`, it was uploaded without those fields. Re-run `POST /questions/bulk` with the full question payload to populate them.
 
 ```json
 {
@@ -231,7 +269,22 @@ curl -s 'http://localhost:3303/questions?page=1&limit=10&difficulty=Easy&categor
       "updatedAt": "2026-06-17T..."
     }
   ],
-  "meta": { "page": 1, "limit": 10, "total": 8, "totalPages": 1 }
+  "meta": {
+    "page": 1,
+    "limit": 10,
+    "total": 8,
+    "totalPages": 1,
+    "appliedFilters": {
+      "category": "Arrays & Hashing",
+      "difficulty": "Easy",
+      "tags": ["array", "hashmap"]
+    }
+  },
+  "filters": {
+    "categories": ["Arrays & Hashing"],
+    "tags": ["array", "hashmap", "heap", "set", "string"],
+    "difficulties": ["Easy", "Medium", "Hard"]
+  }
 }
 ```
 

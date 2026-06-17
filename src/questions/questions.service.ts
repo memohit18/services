@@ -38,6 +38,11 @@ import {
   type QuestionListItemResponse,
   type TestcaseCounts,
 } from './types/question-response.type';
+import type {
+  QuestionFiltersResponse,
+  QuestionListAppliedFilters,
+  QuestionListResponse,
+} from './types/question-filters-response.type';
 
 @Injectable()
 export class QuestionsService {
@@ -54,12 +59,12 @@ export class QuestionsService {
     private readonly testCaseModel: Model<TestCaseDocument>,
   ) {}
 
-  async findAll(query: ListQuestionsQueryDto) {
+  async findAll(query: ListQuestionsQueryDto): Promise<QuestionListResponse> {
     const page = query.page ?? 1;
     const limit = query.limit ?? 20;
     const filter = this.buildQuestionFilter(query);
 
-    const [items, total] = await Promise.all([
+    const [items, total, filters] = await Promise.all([
       this.questionModel
         .find(filter)
         .sort({ questionId: 1 })
@@ -68,6 +73,7 @@ export class QuestionsService {
         .select('-__v')
         .lean(),
       this.questionModel.countDocuments(filter),
+      this.getFilters(),
     ]);
 
     const enrichedItems = await this.buildQuestionListResponse(items);
@@ -79,7 +85,23 @@ export class QuestionsService {
         limit,
         total,
         totalPages: Math.ceil(total / limit) || 0,
+        appliedFilters: this.buildAppliedFilters(query),
       },
+      filters,
+    };
+  }
+
+  async getFilters(): Promise<QuestionFiltersResponse> {
+    const [categories, tags, difficulties] = await Promise.all([
+      this.questionModel.distinct('category').exec(),
+      this.questionModel.distinct('tags').exec(),
+      this.questionModel.distinct('difficulty').exec(),
+    ]);
+
+    return {
+      categories: categories.sort((a, b) => a.localeCompare(b)),
+      tags: tags.sort((a, b) => a.localeCompare(b)),
+      difficulties: difficulties.sort((a, b) => a.localeCompare(b)),
     };
   }
 
@@ -552,6 +574,13 @@ export class QuestionsService {
       filter.difficulty = query.difficulty;
     }
 
+    const tagList = this.parseTagsFilter(query.tags);
+    if (tagList.length === 1) {
+      filter.tags = tagList[0];
+    } else if (tagList.length > 1) {
+      filter.tags = { $in: tagList };
+    }
+
     if (query.search) {
       filter.$or = [
         { title: { $regex: query.search, $options: 'i' } },
@@ -562,6 +591,39 @@ export class QuestionsService {
     }
 
     return filter;
+  }
+
+  private parseTagsFilter(tags?: string) {
+    if (!tags) {
+      return [];
+    }
+
+    return [...new Set(tags.split(',').map((tag) => tag.trim()).filter(Boolean))];
+  }
+
+  private buildAppliedFilters(
+    query: ListQuestionsQueryDto,
+  ): QuestionListAppliedFilters {
+    const appliedFilters: QuestionListAppliedFilters = {};
+
+    if (query.category) {
+      appliedFilters.category = query.category;
+    }
+
+    if (query.difficulty) {
+      appliedFilters.difficulty = query.difficulty;
+    }
+
+    const tags = this.parseTagsFilter(query.tags);
+    if (tags.length > 0) {
+      appliedFilters.tags = tags;
+    }
+
+    if (query.search) {
+      appliedFilters.search = query.search;
+    }
+
+    return appliedFilters;
   }
 }
 

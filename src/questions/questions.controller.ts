@@ -20,6 +20,11 @@ export class QuestionsController {
     return this.questionsService.findAll(query);
   }
 
+  @Get('filters')
+  getFilters() {
+    return this.questionsService.getFilters();
+  }
+
   @Get(':questionId')
   findOne(@Param('questionId', ParseIntPipe) questionId: number) {
     return this.questionsService.findOne(questionId);

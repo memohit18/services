@@ -33,5 +33,9 @@ export class ListQuestionsQueryDto {
 
   @IsOptional()
   @IsString()
+  tags?: string;
+
+  @IsOptional()
+  @IsString()
   search?: string;
 }
