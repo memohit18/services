@@ -1,0 +1,10 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "rootDir": ".",
+    "incremental": false,
+    "tsBuildInfoFile": "./dist/tsconfig.build.tsbuildinfo"
+  },
+  "include": ["src/**/*", "db-schema/mongodb/**/*"],
+  "exclude": ["node_modules", "dist", "db-schema/postgres", "**/*spec.ts"]
+}
