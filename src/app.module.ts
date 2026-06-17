@@ -4,6 +4,7 @@ import { AuthModule } from './auth/auth.module';
 import { HealthModule } from './health/health.module';
 import { MongoDBModule } from './mongodb/mongodb.module';
 import { PrismaModule } from './prisma/prisma.module';
+import { QuestionsModule } from './questions/questions.module';
 import configuration from './config/configuration';
 
 @Module({
@@ -17,6 +18,7 @@ import configuration from './config/configuration';
     MongoDBModule,
     AuthModule,
     HealthModule,
+    QuestionsModule,
   ],
 })
 export class AppModule {}

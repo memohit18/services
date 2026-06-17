@@ -60,6 +60,14 @@ export class GlobalExceptionFilter implements ExceptionFilter {
       };
     }
 
+    if (this.isMongoServerError(exception)) {
+      return {
+        status: HttpStatus.SERVICE_UNAVAILABLE,
+        error: 'Service Unavailable',
+        message: this.getMongoErrorMessage(exception),
+      };
+    }
+
     return {
       status: HttpStatus.INTERNAL_SERVER_ERROR,
       error: 'Internal Server Error',
@@ -75,5 +83,27 @@ export class GlobalExceptionFilter implements ExceptionFilter {
       return message;
     }
     return 'An unexpected error occurred';
+  }
+
+  private isMongoServerError(
+    exception: unknown,
+  ): exception is { name: string; message: string } {
+    return (
+      typeof exception === 'object' &&
+      exception !== null &&
+      'name' in exception &&
+      (exception as { name: string }).name === 'MongoServerError'
+    );
+  }
+
+  private getMongoErrorMessage(exception: {
+    name: string;
+    message: string;
+  }): string {
+    if (exception.message.includes('requires authentication')) {
+      return 'MongoDB authentication failed. Check MONGODB_URL credentials in .env';
+    }
+
+    return 'MongoDB operation failed';
   }
 }

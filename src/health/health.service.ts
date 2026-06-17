@@ -64,7 +64,13 @@ export class HealthService implements OnModuleInit {
       if (this.mongoConnection.readyState !== 1) {
         return 'error';
       }
-      await this.mongoConnection.db?.admin().ping();
+
+      const db = this.mongoConnection.db;
+      if (!db) {
+        return 'error';
+      }
+
+      await db.listCollections().toArray();
       return 'ok';
     } catch {
       return 'error';
