@@ -52,5 +52,9 @@ export type ActivityLogListResponse = {
   filters: {
     modules: string[];
     actions: string[];
+    countsByModule: Record<string, number>;
+    countsByAction: Record<string, number>;
   };
 };
+
+export type ActivityLogFilterSummary = ActivityLogListResponse['filters'];

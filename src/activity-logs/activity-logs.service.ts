@@ -1,12 +1,13 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, NotFoundException } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
-import { Model } from 'mongoose';
+import { Model, Types } from 'mongoose';
 import {
   ACTIVITY_LOG_MODEL,
   ActivityLogDocument,
 } from '../../db-schema/mongodb/schemas/activity-log.schema';
 import { ListActivityLogsQueryDto } from './dto/list-activity-logs-query.dto';
 import type {
+  ActivityLogFilterSummary,
   ActivityLogListResponse,
   ActivityLogResponse,
   CreateActivityLogInput,
@@ -76,17 +77,58 @@ export class ActivityLogsService {
     };
   }
 
-  async getFilterOptions(userId: string) {
+  async findOne(
+    userId: string,
+    activityLogId: string,
+  ): Promise<ActivityLogResponse> {
+    if (!Types.ObjectId.isValid(activityLogId)) {
+      throw new NotFoundException(`Activity log ${activityLogId} not found`);
+    }
+
+    const log = await this.activityLogModel
+      .findOne({ _id: activityLogId, userId })
+      .select('-__v')
+      .lean();
+
+    if (!log) {
+      throw new NotFoundException(`Activity log ${activityLogId} not found`);
+    }
+
+    return this.formatActivityLog(log);
+  }
+
+  async getFilterOptions(userId: string): Promise<ActivityLogFilterSummary> {
     const baseFilter = { userId };
 
-    const [modules, actions] = await Promise.all([
+    const [modules, actions, moduleCounts, actionCounts] = await Promise.all([
       this.activityLogModel.distinct('module', baseFilter).exec(),
       this.activityLogModel.distinct('action', baseFilter).exec(),
+      this.activityLogModel.aggregate<{ _id: string; count: number }>([
+        { $match: baseFilter },
+        { $group: { _id: '$module', count: { $sum: 1 } } },
+      ]),
+      this.activityLogModel.aggregate<{ _id: string; count: number }>([
+        { $match: baseFilter },
+        { $group: { _id: '$action', count: { $sum: 1 } } },
+      ]),
     ]);
+
+    const countsByModule: Record<string, number> = {};
+    const countsByAction: Record<string, number> = {};
+
+    for (const entry of moduleCounts) {
+      countsByModule[entry._id] = entry.count;
+    }
+
+    for (const entry of actionCounts) {
+      countsByAction[entry._id] = entry.count;
+    }
 
     return {
       modules: modules.sort((a, b) => a.localeCompare(b)),
       actions: actions.sort((a, b) => a.localeCompare(b)),
+      countsByModule,
+      countsByAction,
     };
   }
 

@@ -1,4 +1,4 @@
-import { Controller, Get, Query } from '@nestjs/common';
+import { Controller, Get, Param, Query } from '@nestjs/common';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
 import type { CurrentUserPayload } from '../common/decorators/current-user.decorator';
 import { ActivityLogsService } from './activity-logs.service';
@@ -19,5 +19,13 @@ export class ActivityLogsController {
   @Get('filters')
   getFilters(@CurrentUser() user: CurrentUserPayload) {
     return this.activityLogsService.getFilterOptions(user.userId);
+  }
+
+  @Get(':activityLogId')
+  findOne(
+    @CurrentUser() user: CurrentUserPayload,
+    @Param('activityLogId') activityLogId: string,
+  ) {
+    return this.activityLogsService.findOne(user.userId, activityLogId);
   }
 }
