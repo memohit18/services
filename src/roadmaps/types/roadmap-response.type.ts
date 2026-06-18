@@ -7,14 +7,11 @@ export type RoadmapQuestionInput = {
 
 export type RoadmapListItemResponse = {
   roadmapId: string;
-  userId: string;
   name: string;
   slug: string;
   description?: string;
   isActive: boolean;
   questionCount: number;
-  createdAt?: Date;
-  updatedAt?: Date;
 };
 
 export type RoadmapDetailResponse = RoadmapListItemResponse & {

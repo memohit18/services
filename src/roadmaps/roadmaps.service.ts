@@ -79,7 +79,7 @@ export class RoadmapsService {
       name: dto.name,
       slug: dto.slug,
       description: dto.description,
-      isActive: dto.isActive ?? false,
+      isActive: false,
       questionCount: dto.questions.length,
     });
 
@@ -92,7 +92,13 @@ export class RoadmapsService {
       })),
     );
 
-    const formatted = await this.formatRoadmapDetail(roadmap);
+    if (dto.isActive) {
+      await this.setActiveRoadmapForUser(userId, roadmap._id);
+    }
+
+    const formatted = await this.formatRoadmapDetail(
+      (await this.roadmapModel.findById(roadmap._id).lean()) ?? roadmap,
+    );
 
     if (context?.userId) {
       await this.activityLogsService.log({
@@ -105,6 +111,52 @@ export class RoadmapsService {
           name: formatted.name,
           isActive: formatted.isActive,
           questionCount: formatted.questionCount,
+        },
+      });
+    }
+
+    return formatted;
+  }
+
+  async activate(
+    userId: string,
+    roadmapId: string,
+    context?: ActivityLogContext,
+  ): Promise<RoadmapDetailResponse> {
+    if (!Types.ObjectId.isValid(roadmapId)) {
+      throw new NotFoundException(`Roadmap ${roadmapId} not found`);
+    }
+
+    const roadmap = await this.roadmapModel
+      .findOne({ _id: roadmapId, userId })
+      .lean();
+
+    if (!roadmap) {
+      throw new NotFoundException(`Roadmap ${roadmapId} not found`);
+    }
+
+    await this.setActiveRoadmapForUser(userId, roadmap._id);
+
+    const updated = await this.roadmapModel.findById(roadmap._id).lean();
+
+    if (!updated) {
+      throw new NotFoundException(`Roadmap ${roadmapId} not found`);
+    }
+
+    const formatted = await this.formatRoadmapDetail(updated);
+
+    if (context?.userId) {
+      await this.activityLogsService.log({
+        ...context,
+        module: ActivityModule.ROADMAPS,
+        action: ActivityAction.UPDATE,
+        payload: {
+          roadmapId: formatted.roadmapId,
+          slug: formatted.slug,
+          name: formatted.name,
+          isActive: true,
+          questionCount: formatted.questionCount,
+          action: 'activate',
         },
       });
     }
@@ -278,6 +330,30 @@ export class RoadmapsService {
     }
   }
 
+  private async setActiveRoadmapForUser(
+    userId: string,
+    roadmapId: Types.ObjectId,
+  ) {
+    await this.roadmapModel.bulkWrite([
+      {
+        updateMany: {
+          filter: {
+            userId,
+            isActive: true,
+            _id: { $ne: roadmapId },
+          },
+          update: { $set: { isActive: false } },
+        },
+      },
+      {
+        updateOne: {
+          filter: { _id: roadmapId, userId },
+          update: { $set: { isActive: true } },
+        },
+      },
+    ]);
+  }
+
   private async deactivateUserRoadmaps(userId: string) {
     await this.roadmapModel.updateMany(
       { userId, isActive: true },
@@ -319,25 +395,19 @@ export class RoadmapsService {
 
   private formatRoadmapListItem(roadmap: {
     _id: { toString(): string };
-    userId: string | number;
     name: string;
     slug: string;
     description?: string;
     isActive: boolean;
     questionCount: number;
-    createdAt?: Date;
-    updatedAt?: Date;
   }) {
     return {
       roadmapId: roadmap._id.toString(),
-      userId: String(roadmap.userId),
       name: roadmap.name,
       slug: roadmap.slug,
       description: roadmap.description,
       isActive: roadmap.isActive,
       questionCount: roadmap.questionCount,
-      createdAt: roadmap.createdAt,
-      updatedAt: roadmap.updatedAt,
     };
   }
 }

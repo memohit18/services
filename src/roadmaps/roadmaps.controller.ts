@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Post, Query, Req } from '@nestjs/common';
+import { Body, Controller, Get, Param, Post, Put, Query, Req } from '@nestjs/common';
 import type { Request } from 'express';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
 import type { CurrentUserPayload } from '../common/decorators/current-user.decorator';
@@ -34,5 +34,17 @@ export class RoadmapsController {
   @Get('filters')
   getFilters(@CurrentUser() user: CurrentUserPayload) {
     return this.roadmapsService.getFilterSummary(user.userId);
+  }
+
+  @Put(':roadmapId/activate')
+  activate(
+    @CurrentUser() user: CurrentUserPayload,
+    @Param('roadmapId') roadmapId: string,
+    @Req() req: Request,
+  ) {
+    return this.roadmapsService.activate(user.userId, roadmapId, {
+      userId: user.userId,
+      ...getRequestMetadata(req),
+    });
   }
 }
