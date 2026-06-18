@@ -43,6 +43,12 @@ import type {
   QuestionListAppliedFilters,
   QuestionListResponse,
 } from './types/question-filters-response.type';
+import { ActivityLogsService } from '../activity-logs/activity-logs.service';
+import {
+  ActivityAction,
+  ActivityModule,
+  type ActivityLogContext,
+} from '../activity-logs/types/activity-log.types';
 
 @Injectable()
 export class QuestionsService {
@@ -57,6 +63,7 @@ export class QuestionsService {
     private readonly followUpModel: Model<FollowUpDocument>,
     @InjectModel(TEST_CASE_MODEL)
     private readonly testCaseModel: Model<TestCaseDocument>,
+    private readonly activityLogsService: ActivityLogsService,
   ) {}
 
   async findAll(query: ListQuestionsQueryDto): Promise<QuestionListResponse> {
@@ -154,7 +161,7 @@ export class QuestionsService {
     };
   }
 
-  async bulkUpload(dto: BulkUploadQuestionsDto) {
+  async bulkUpload(dto: BulkUploadQuestionsDto, context?: ActivityLogContext) {
     if (!dto.questions?.length && !dto.testcases?.length) {
       throw new BadRequestException(
         'At least one question or testcase is required',
@@ -190,13 +197,31 @@ export class QuestionsService {
       ? await this.upsertTestCases(dto.testcases, questionIdMap)
       : { inserted: 0, upsertedQuestionIds: 0 };
 
-    return {
+    const result = {
       questions: questionResult,
       examples: examplesAndHintsResult.examples,
       hints: examplesAndHintsResult.hints,
       followUps: examplesAndHintsResult.followUps,
       testcases: testcaseResult,
     };
+
+    if (context?.userId) {
+      await this.activityLogsService.log({
+        ...context,
+        module: ActivityModule.QUESTIONS,
+        action: ActivityAction.BULK_UPLOAD,
+        payload: {
+          questionIds: dto.questions?.map((q) => q.questionId) ?? [],
+          questionTitles: dto.questions?.map((q) => q.title) ?? [],
+          testcaseQuestionIds: [
+            ...new Set(dto.testcases?.map((t) => t.questionId) ?? []),
+          ],
+          summary: result,
+        },
+      });
+    }
+
+    return result;
   }
 
   private async upsertQuestions(

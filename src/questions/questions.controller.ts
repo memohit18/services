@@ -6,7 +6,12 @@ import {
   ParseIntPipe,
   Post,
   Query,
+  Req,
 } from '@nestjs/common';
+import type { Request } from 'express';
+import { CurrentUser } from '../common/decorators/current-user.decorator';
+import type { CurrentUserPayload } from '../common/decorators/current-user.decorator';
+import { getRequestMetadata } from '../common/utils/request-metadata.util';
 import { BulkUploadQuestionsDto } from './dto/bulk-upload-questions.dto';
 import { ListQuestionsQueryDto } from './dto/list-questions-query.dto';
 import { QuestionsService } from './questions.service';
@@ -31,7 +36,14 @@ export class QuestionsController {
   }
 
   @Post('bulk')
-  bulkUpload(@Body() dto: BulkUploadQuestionsDto) {
-    return this.questionsService.bulkUpload(dto);
+  bulkUpload(
+    @CurrentUser() user: CurrentUserPayload,
+    @Body() dto: BulkUploadQuestionsDto,
+    @Req() req: Request,
+  ) {
+    return this.questionsService.bulkUpload(dto, {
+      userId: user.userId,
+      ...getRequestMetadata(req),
+    });
   }
 }

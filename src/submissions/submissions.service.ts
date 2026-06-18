@@ -19,6 +19,13 @@ import type {
   SubmissionListResponse,
   SubmissionResponse,
 } from './types/submission-response.type';
+import { ActivityLogsService } from '../activity-logs/activity-logs.service';
+import {
+  ActivityAction,
+  ActivityModule,
+  type ActivityLogContext,
+} from '../activity-logs/types/activity-log.types';
+import { UserProgressService } from '../user-progress/user-progress.service';
 
 @Injectable()
 export class SubmissionsService {
@@ -29,12 +36,15 @@ export class SubmissionsService {
     private readonly questionModel: Model<QuestionDocument>,
     @InjectModel(TEST_CASE_MODEL)
     private readonly testCaseModel: Model<TestCaseDocument>,
+    private readonly activityLogsService: ActivityLogsService,
+    private readonly userProgressService: UserProgressService,
   ) {}
 
   async create(
     questionId: number,
     userId: string,
     dto: CreateSubmissionDto,
+    context?: ActivityLogContext,
   ): Promise<SubmissionResponse> {
     await this.ensureQuestionExists(questionId);
 
@@ -54,7 +64,34 @@ export class SubmissionsService {
       memoryUsed: dto.memoryUsed,
     });
 
-    return this.formatSubmission(submission);
+    const formatted = this.formatSubmission(submission);
+
+    await this.userProgressService.recordSubmissionAttempt(
+      userId,
+      questionId,
+      dto.status,
+    );
+
+    if (context?.userId) {
+      await this.activityLogsService.log({
+        ...context,
+        module: ActivityModule.SUBMISSIONS,
+        action: ActivityAction.CREATE,
+        payload: {
+          submissionId: formatted.submissionId,
+          questionId,
+          language: dto.language,
+          status: dto.status,
+          passedTestCases: formatted.passedTestCases,
+          totalTestCases: formatted.totalTestCases,
+          executionTime: formatted.executionTime,
+          memoryUsed: formatted.memoryUsed,
+          codeLength: dto.code.length,
+        },
+      });
+    }
+
+    return formatted;
   }
 
   async findAllForQuestion(

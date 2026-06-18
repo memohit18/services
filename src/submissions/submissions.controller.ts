@@ -6,9 +6,12 @@ import {
   ParseIntPipe,
   Post,
   Query,
+  Req,
 } from '@nestjs/common';
+import type { Request } from 'express';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
 import type { CurrentUserPayload } from '../common/decorators/current-user.decorator';
+import { getRequestMetadata } from '../common/utils/request-metadata.util';
 import { CreateSubmissionDto } from './dto/create-submission.dto';
 import { ListSubmissionsQueryDto } from './dto/list-submissions-query.dto';
 import { SubmissionsService } from './submissions.service';
@@ -22,8 +25,12 @@ export class SubmissionsController {
     @Param('questionId', ParseIntPipe) questionId: number,
     @CurrentUser() user: CurrentUserPayload,
     @Body() dto: CreateSubmissionDto,
+    @Req() req: Request,
   ) {
-    return this.submissionsService.create(questionId, user.userId, dto);
+    return this.submissionsService.create(questionId, user.userId, dto, {
+      userId: user.userId,
+      ...getRequestMetadata(req),
+    });
   }
 
   @Get()
