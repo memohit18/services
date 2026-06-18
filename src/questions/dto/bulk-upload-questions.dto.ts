@@ -10,10 +10,16 @@ import {
   IsOptional,
   IsString,
   Min,
+  Validate,
   ValidateNested,
 } from 'class-validator';
 import { Type } from 'class-transformer';
-import { QUESTION_DIFFICULTIES } from '../../../db-schema/mongodb/schemas/question.schema';
+import {
+  QUESTION_DIFFICULTIES,
+  QUESTION_OUTPUT_TYPES,
+} from '../../../db-schema/mongodb/schemas/question.schema';
+import { TEST_CASE_VALIDATION_TYPES } from '../../../db-schema/mongodb/schemas/test-case.schema';
+import { TestCaseOutputRuleConstraint } from '../validators/testcase-output.validator';
 
 export class QuestionExampleDto {
   @IsDefined()
@@ -68,6 +74,10 @@ export class QuestionItemDto {
   tags: string[];
 
   @IsOptional()
+  @IsIn(QUESTION_OUTPUT_TYPES)
+  outputType?: (typeof QUESTION_OUTPUT_TYPES)[number];
+
+  @IsOptional()
   @IsArray()
   @ValidateNested({ each: true })
   @Type(() => QuestionExampleDto)
@@ -90,10 +100,20 @@ export class TestCaseItemDto {
   questionId: number;
 
   @IsDefined()
+  @Validate(TestCaseOutputRuleConstraint)
   input: unknown;
 
-  @IsDefined()
-  expectedOutput: unknown;
+  @IsOptional()
+  @IsIn(TEST_CASE_VALIDATION_TYPES)
+  validationType?: (typeof TEST_CASE_VALIDATION_TYPES)[number];
+
+  @IsOptional()
+  expectedOutput?: unknown;
+
+  @IsOptional()
+  @IsInt()
+  @Min(0)
+  expectedOutputCount?: number;
 
   @IsOptional()
   @IsBoolean()

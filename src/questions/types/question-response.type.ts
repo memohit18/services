@@ -6,10 +6,27 @@ export type QuestionExampleResponse = {
 
 export type QuestionTestcaseResponse = {
   input: unknown;
-  expectedOutput: unknown;
+  validationType: 'exact' | 'count_only';
+  expectedOutput?: unknown;
+  expectedOutputCount?: number;
   isSample: boolean;
   isHidden: boolean;
   weight: number;
+};
+
+export type QuestionTestcaseSummary = {
+  total: number;
+  sample: number;
+  hidden: number;
+  exact: number;
+  countOnly: number;
+  hiddenCountOnly: number;
+};
+
+export type QuestionJudgingResponse = {
+  outputType: string;
+  supportsCountOnlyValidation: boolean;
+  comparisonNote?: string;
 };
 
 export type QuestionListItemResponse = {
@@ -23,6 +40,7 @@ export type QuestionListItemResponse = {
   expectedTimeComplexity?: string;
   expectedSpaceComplexity?: string;
   tags: string[];
+  outputType?: string;
   followUps: string[];
   examples: QuestionExampleResponse[];
   hints: string[];
@@ -34,6 +52,8 @@ export type QuestionListItemResponse = {
 
 export type QuestionDetailResponse = QuestionListItemResponse & {
   sampleTestcases: QuestionTestcaseResponse[];
+  testcaseSummary: QuestionTestcaseSummary;
+  judging: QuestionJudgingResponse;
   hiddenTestcaseCount: number;
 };
 
@@ -43,19 +63,78 @@ type TestcaseCounts = {
   hiddenTestcaseCount: number;
 };
 
+export function resolveTestcaseValidationType(testcase: {
+  validationType?: 'exact' | 'count_only';
+  expectedOutput?: unknown;
+  expectedOutputCount?: number;
+}): 'exact' | 'count_only' {
+  if (testcase.validationType) {
+    return testcase.validationType;
+  }
+
+  if (
+    testcase.expectedOutputCount !== undefined &&
+    testcase.expectedOutput === undefined
+  ) {
+    return 'count_only';
+  }
+
+  return 'exact';
+}
+
 export function formatTestcaseResponse(testcase: {
   input: unknown;
-  expectedOutput: unknown;
+  validationType?: 'exact' | 'count_only';
+  expectedOutput?: unknown;
+  expectedOutputCount?: number;
   isSample?: boolean;
   isHidden?: boolean;
   weight?: number;
 }): QuestionTestcaseResponse {
+  const validationType = resolveTestcaseValidationType(testcase);
+
   return {
     input: testcase.input,
-    expectedOutput: testcase.expectedOutput,
+    validationType,
+    ...(validationType === 'count_only'
+      ? { expectedOutputCount: testcase.expectedOutputCount ?? 0 }
+      : { expectedOutput: testcase.expectedOutput }),
     isSample: Boolean(testcase.isSample),
     isHidden: Boolean(testcase.isHidden),
     weight: typeof testcase.weight === 'number' ? testcase.weight : 1,
+  };
+}
+
+export function emptyTestcaseSummary(): QuestionTestcaseSummary {
+  return {
+    total: 0,
+    sample: 0,
+    hidden: 0,
+    exact: 0,
+    countOnly: 0,
+    hiddenCountOnly: 0,
+  };
+}
+
+export function buildJudgingInfo(
+  outputType: string | undefined,
+  summary: QuestionTestcaseSummary,
+): QuestionJudgingResponse {
+  const resolvedOutputType =
+    outputType ?? (summary.countOnly > 0 ? 'unordered_array' : 'exact');
+
+  const comparisonNotes: Record<string, string> = {
+    exact: 'Outputs are compared exactly.',
+    unordered_array:
+      'Array outputs are compared after sorting (order does not matter).',
+    unordered_nested_array:
+      'Nested array outputs are normalized and sorted before comparison.',
+  };
+
+  return {
+    outputType: resolvedOutputType,
+    supportsCountOnlyValidation: summary.countOnly > 0,
+    comparisonNote: comparisonNotes[resolvedOutputType],
   };
 }
 

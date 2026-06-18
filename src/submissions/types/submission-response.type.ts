@@ -1,4 +1,15 @@
 import type { SubmissionStatus } from '../../../db-schema/mongodb/schemas/submission.schema';
+import type {
+  QuestionJudgingResponse,
+  QuestionTestcaseSummary,
+} from '../../questions/types/question-response.type';
+
+export type SubmissionQuestionContext = {
+  questionId: number;
+  outputType?: string;
+  judging: QuestionJudgingResponse;
+  testcaseSummary: QuestionTestcaseSummary;
+};
 
 export type SubmissionResponse = {
   submissionId: string;
@@ -15,6 +26,10 @@ export type SubmissionResponse = {
   updatedAt?: Date;
 };
 
+export type SubmissionCreateResponse = SubmissionResponse & {
+  question: SubmissionQuestionContext;
+};
+
 export type SubmissionListResponse = {
   items: SubmissionResponse[];
   meta: {
@@ -24,4 +39,5 @@ export type SubmissionListResponse = {
     totalPages: number;
     questionId: number;
   };
+  question: SubmissionQuestionContext;
 };

@@ -30,8 +30,11 @@ import {
   QuestionItemDto,
 } from './dto/bulk-upload-questions.dto';
 import { ListQuestionsQueryDto } from './dto/list-questions-query.dto';
+import { getTestcaseSummaryByQuestionIds } from '../common/utils/testcase-summary.util';
 import {
+  buildJudgingInfo,
   emptyTestcaseCounts,
+  emptyTestcaseSummary,
   formatTestcaseResponse,
   type QuestionDetailResponse,
   type QuestionExampleResponse,
@@ -128,6 +131,7 @@ export class QuestionsService {
       followUpsByQuestionId,
       testcaseCountsByQuestionId,
       sampleTestcases,
+      testcaseSummary,
     ] = await Promise.all([
       this.getExamplesByQuestionId([questionId]),
       this.getHintsByQuestionId([questionId]),
@@ -138,8 +142,14 @@ export class QuestionsService {
           questionId,
           $or: [{ isSample: true }, { isHidden: false }],
         })
-        .select('input expectedOutput isSample isHidden weight')
+        .sort({ 'input.n': 1, createdAt: 1 })
+        .select(
+          'input validationType expectedOutput expectedOutputCount isSample isHidden weight',
+        )
         .lean(),
+      this.getTestcaseSummary([questionId]).then(
+        (summaryMap) => summaryMap.get(questionId) ?? emptyTestcaseSummary(),
+      ),
     ]);
 
     const counts =
@@ -157,6 +167,8 @@ export class QuestionsService {
       sampleTestcases: sampleTestcases.map((testcase) =>
         formatTestcaseResponse(testcase),
       ),
+      testcaseSummary,
+      judging: buildJudgingInfo(question.outputType, testcaseSummary),
       hiddenTestcaseCount: counts.hiddenTestcaseCount,
     };
   }
@@ -343,14 +355,12 @@ export class QuestionsService {
     testcases: NonNullable<BulkUploadQuestionsDto['testcases']>,
     questionIdMap: Map<number, number>,
   ) {
-    const docs = testcases.map((testcase) => ({
-      questionId: questionIdMap.get(testcase.questionId) ?? testcase.questionId,
-      input: testcase.input,
-      expectedOutput: testcase.expectedOutput,
-      isSample: testcase.isSample ?? false,
-      isHidden: testcase.isHidden ?? true,
-      weight: testcase.weight ?? 1,
-    }));
+    const docs = testcases.map((testcase) =>
+      this.buildTestCaseDocument(
+        testcase,
+        questionIdMap.get(testcase.questionId) ?? testcase.questionId,
+      ),
+    );
 
     const affectedQuestionIds = [
       ...new Set(docs.map((testcase) => testcase.questionId)),
@@ -377,6 +387,39 @@ export class QuestionsService {
     } = question;
 
     return questionData;
+  }
+
+  private buildTestCaseDocument(
+    testcase: NonNullable<BulkUploadQuestionsDto['testcases']>[number],
+    questionId: number,
+  ) {
+    const validationType =
+      testcase.validationType ??
+      (testcase.expectedOutputCount !== undefined &&
+      testcase.expectedOutput === undefined
+        ? 'count_only'
+        : 'exact');
+
+    const base = {
+      questionId,
+      input: testcase.input,
+      validationType,
+      isSample: testcase.isSample ?? false,
+      isHidden: testcase.isHidden ?? true,
+      weight: testcase.weight ?? 1,
+    };
+
+    if (validationType === 'count_only') {
+      return {
+        ...base,
+        expectedOutputCount: testcase.expectedOutputCount,
+      };
+    }
+
+    return {
+      ...base,
+      expectedOutput: testcase.expectedOutput,
+    };
   }
 
   private async buildQuestionListResponse(
@@ -432,6 +475,7 @@ export class QuestionsService {
       expectedTimeComplexity: question.expectedTimeComplexity,
       expectedSpaceComplexity: question.expectedSpaceComplexity,
       tags: question.tags ?? [],
+      outputType: question.outputType,
       followUps: this.resolveFollowUps(related.followUps, question),
       examples: this.resolveExamples(related.examples, question),
       hints: this.resolveHints(related.hints, question),
@@ -588,6 +632,10 @@ export class QuestionsService {
     return countsByQuestionId;
   }
 
+  private getTestcaseSummary(questionIds: number[]) {
+    return getTestcaseSummaryByQuestionIds(this.testCaseModel, questionIds);
+  }
+
   private buildQuestionFilter(query: ListQuestionsQueryDto) {
     const filter: Record<string, unknown> = {};
 
@@ -663,6 +711,7 @@ type QuestionSourceDocument = {
   expectedTimeComplexity?: string;
   expectedSpaceComplexity?: string;
   tags?: string[];
+  outputType?: string;
   examples?: QuestionExampleResponse[];
   hints?: string[];
   followUps?: string[];

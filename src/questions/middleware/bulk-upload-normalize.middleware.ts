@@ -21,7 +21,10 @@ export class BulkUploadNormalizeMiddleware implements NestMiddleware {
 
     const firstItem = req.body[0] as Record<string, unknown>;
 
-    if ('input' in firstItem && 'expectedOutput' in firstItem) {
+    if (
+      'input' in firstItem &&
+      ('expectedOutput' in firstItem || 'expectedOutputCount' in firstItem)
+    ) {
       req.body = { testcases: req.body };
       next();
       return;

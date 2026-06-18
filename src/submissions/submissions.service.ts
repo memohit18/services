@@ -13,10 +13,13 @@ import {
   TEST_CASE_MODEL,
   TestCaseDocument,
 } from '../../db-schema/mongodb/schemas/test-case.schema';
+import { getQuestionJudgingContext } from '../common/utils/question-judging-context.util';
 import { CreateSubmissionDto } from './dto/create-submission.dto';
 import { ListSubmissionsQueryDto } from './dto/list-submissions-query.dto';
 import type {
+  SubmissionCreateResponse,
   SubmissionListResponse,
+  SubmissionQuestionContext,
   SubmissionResponse,
 } from './types/submission-response.type';
 import { ActivityLogsService } from '../activity-logs/activity-logs.service';
@@ -45,12 +48,11 @@ export class SubmissionsService {
     userId: string,
     dto: CreateSubmissionDto,
     context?: ActivityLogContext,
-  ): Promise<SubmissionResponse> {
-    await this.ensureQuestionExists(questionId);
+  ): Promise<SubmissionCreateResponse> {
+    const questionContext = await this.getQuestionContext(questionId);
 
     const totalTestCases =
-      dto.totalTestCases ??
-      (await this.testCaseModel.countDocuments({ questionId }));
+      dto.totalTestCases ?? questionContext.testcaseSummary.total;
 
     const submission = await this.submissionModel.create({
       userId,
@@ -77,21 +79,18 @@ export class SubmissionsService {
         ...context,
         module: ActivityModule.SUBMISSIONS,
         action: ActivityAction.CREATE,
-        payload: {
-          submissionId: formatted.submissionId,
-          questionId,
-          language: dto.language,
-          status: dto.status,
-          passedTestCases: formatted.passedTestCases,
-          totalTestCases: formatted.totalTestCases,
-          executionTime: formatted.executionTime,
-          memoryUsed: formatted.memoryUsed,
-          codeLength: dto.code.length,
-        },
+        payload: this.buildSubmissionActivityPayload(
+          formatted,
+          questionContext,
+          dto.code.length,
+        ),
       });
     }
 
-    return formatted;
+    return {
+      ...formatted,
+      question: questionContext,
+    };
   }
 
   async findAllForQuestion(
@@ -99,7 +98,7 @@ export class SubmissionsService {
     userId: string,
     query: ListSubmissionsQueryDto,
   ): Promise<SubmissionListResponse> {
-    await this.ensureQuestionExists(questionId);
+    const questionContext = await this.getQuestionContext(questionId);
 
     const page = query.page ?? 1;
     const limit = query.limit ?? 20;
@@ -125,18 +124,45 @@ export class SubmissionsService {
         totalPages: Math.ceil(total / limit) || 0,
         questionId,
       },
+      question: questionContext,
     };
   }
 
-  private async ensureQuestionExists(questionId: number) {
-    const question = await this.questionModel
-      .findOne({ questionId })
-      .select('_id')
-      .lean();
+  private async getQuestionContext(
+    questionId: number,
+  ): Promise<SubmissionQuestionContext> {
+    const questionContext = await getQuestionJudgingContext(
+      this.questionModel,
+      this.testCaseModel,
+      questionId,
+    );
 
-    if (!question) {
+    if (!questionContext) {
       throw new NotFoundException(`Question ${questionId} not found`);
     }
+
+    return questionContext;
+  }
+
+  private buildSubmissionActivityPayload(
+    submission: SubmissionResponse,
+    questionContext: SubmissionQuestionContext,
+    codeLength: number,
+  ) {
+    return {
+      submissionId: submission.submissionId,
+      questionId: submission.questionId,
+      language: submission.language,
+      status: submission.status,
+      passedTestCases: submission.passedTestCases,
+      totalTestCases: submission.totalTestCases,
+      executionTime: submission.executionTime,
+      memoryUsed: submission.memoryUsed,
+      codeLength,
+      outputType: questionContext.outputType,
+      judging: questionContext.judging,
+      testcaseSummary: questionContext.testcaseSummary,
+    };
   }
 
   private formatSubmission(submission: {
