@@ -3,6 +3,7 @@ export const ActivityModule = {
   QUESTIONS: 'questions',
   SUBMISSIONS: 'submissions',
   USER_PROGRESS: 'user_progress',
+  ROADMAPS: 'roadmaps',
 } as const;
 
 /** Reference action names — any string is allowed when logging. */

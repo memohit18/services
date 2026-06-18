@@ -27,6 +27,14 @@ import {
   QuestionSchema,
 } from '../../db-schema/mongodb/schemas/question.schema';
 import {
+  ROADMAP_MODEL,
+  RoadmapSchema,
+} from '../../db-schema/mongodb/schemas/roadmap.schema';
+import {
+  ROADMAP_QUESTION_MODEL,
+  RoadmapQuestionSchema,
+} from '../../db-schema/mongodb/schemas/roadmap-question.schema';
+import {
   SUBMISSION_MODEL,
   SubmissionSchema,
 } from '../../db-schema/mongodb/schemas/submission.schema';
@@ -58,6 +66,8 @@ import {
       { name: FOLLOW_UP_MODEL, schema: FollowUpSchema },
       { name: HINT_MODEL, schema: HintSchema },
       { name: TEST_CASE_MODEL, schema: TestCaseSchema },
+      { name: ROADMAP_MODEL, schema: RoadmapSchema },
+      { name: ROADMAP_QUESTION_MODEL, schema: RoadmapQuestionSchema },
       { name: SUBMISSION_MODEL, schema: SubmissionSchema },
       { name: USER_PROGRESS_MODEL, schema: UserProgressSchema },
       { name: NOTE_MODEL, schema: NoteSchema },

@@ -21,8 +21,11 @@ export class QuestionsController {
   constructor(private readonly questionsService: QuestionsService) {}
 
   @Get()
-  findAll(@Query() query: ListQuestionsQueryDto) {
-    return this.questionsService.findAll(query);
+  findAll(
+    @CurrentUser() user: CurrentUserPayload,
+    @Query() query: ListQuestionsQueryDto,
+  ) {
+    return this.questionsService.findAll(query, user.userId);
   }
 
   @Get('filters')

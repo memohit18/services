@@ -52,6 +52,8 @@ import {
   ActivityModule,
   type ActivityLogContext,
 } from '../activity-logs/types/activity-log.types';
+import { RoadmapsService } from '../roadmaps/roadmaps.service';
+import type { QuestionListItemWithRoadmap } from './types/question-filters-response.type';
 
 @Injectable()
 export class QuestionsService {
@@ -67,11 +69,28 @@ export class QuestionsService {
     @InjectModel(TEST_CASE_MODEL)
     private readonly testCaseModel: Model<TestCaseDocument>,
     private readonly activityLogsService: ActivityLogsService,
+    private readonly roadmapsService: RoadmapsService,
   ) {}
 
-  async findAll(query: ListQuestionsQueryDto): Promise<QuestionListResponse> {
+  async findAll(
+    query: ListQuestionsQueryDto,
+    userId: string,
+  ): Promise<QuestionListResponse> {
     const page = query.page ?? 1;
     const limit = query.limit ?? 20;
+    const roadmapContext = await this.roadmapsService.resolveRoadmapFilter(
+      userId,
+      {
+        roadmapId: query.roadmapId,
+        roadmap: query.roadmap,
+        useActiveRoadmap: query.useActiveRoadmap,
+      },
+    );
+
+    if (roadmapContext) {
+      return this.findAllForRoadmap(query, userId, roadmapContext, page, limit);
+    }
+
     const filter = this.buildQuestionFilter(query);
 
     const [items, total, filters] = await Promise.all([
@@ -96,6 +115,95 @@ export class QuestionsService {
         total,
         totalPages: Math.ceil(total / limit) || 0,
         appliedFilters: this.buildAppliedFilters(query),
+      },
+      filters,
+    };
+  }
+
+  private async findAllForRoadmap(
+    query: ListQuestionsQueryDto,
+    userId: string,
+    roadmapContext: NonNullable<
+      Awaited<ReturnType<RoadmapsService['resolveRoadmapFilter']>>
+    >,
+    page: number,
+    limit: number,
+  ): Promise<QuestionListResponse> {
+    const filter = this.buildQuestionFilter(query);
+
+    if (roadmapContext.orderedQuestionIds.length === 0) {
+      return {
+        items: [],
+        meta: {
+          page,
+          limit,
+          total: 0,
+          totalPages: 0,
+          appliedFilters: this.buildAppliedFilters(query),
+          roadmap: {
+            roadmapId: roadmapContext.roadmapId,
+            slug: roadmapContext.slug,
+            name: roadmapContext.name,
+            isActive: roadmapContext.isActive,
+          },
+        },
+        filters: await this.getFilters(),
+      };
+    }
+
+    filter.questionId = { $in: roadmapContext.orderedQuestionIds };
+
+    const [allMatching, filters, orderMap] = await Promise.all([
+      this.questionModel.find(filter).select('-__v').lean(),
+      this.getFilters(),
+      this.roadmapsService.getRoadmapOrderMap(
+        userId,
+        roadmapContext.roadmapId,
+      ),
+    ]);
+
+    const orderIndex = new Map(
+      roadmapContext.orderedQuestionIds.map((questionId, index) => [
+        questionId,
+        index,
+      ]),
+    );
+
+    allMatching.sort(
+      (left, right) =>
+        (orderIndex.get(left.questionId) ?? Number.MAX_SAFE_INTEGER) -
+        (orderIndex.get(right.questionId) ?? Number.MAX_SAFE_INTEGER),
+    );
+
+    const total = allMatching.length;
+    const pagedItems = allMatching.slice((page - 1) * limit, page * limit);
+    const enrichedItems = await this.buildQuestionListResponse(pagedItems);
+
+    const itemsWithRoadmap: QuestionListItemWithRoadmap[] =
+      enrichedItems.map((item) => ({
+        ...item,
+        roadmap: {
+          roadmapId: roadmapContext.roadmapId,
+          slug: roadmapContext.slug,
+          name: roadmapContext.name,
+          order: orderMap.get(item.questionId) ?? 0,
+        },
+      }));
+
+    return {
+      items: itemsWithRoadmap,
+      meta: {
+        page,
+        limit,
+        total,
+        totalPages: Math.ceil(total / limit) || 0,
+        appliedFilters: this.buildAppliedFilters(query),
+        roadmap: {
+          roadmapId: roadmapContext.roadmapId,
+          slug: roadmapContext.slug,
+          name: roadmapContext.name,
+          isActive: roadmapContext.isActive,
+        },
       },
       filters,
     };
@@ -694,6 +802,18 @@ export class QuestionsService {
 
     if (query.search) {
       appliedFilters.search = query.search;
+    }
+
+    if (query.roadmapId) {
+      appliedFilters.roadmapId = query.roadmapId;
+    }
+
+    if (query.roadmap) {
+      appliedFilters.roadmap = query.roadmap;
+    }
+
+    if (query.useActiveRoadmap) {
+      appliedFilters.useActiveRoadmap = true;
     }
 
     return appliedFilters;
