@@ -7,6 +7,12 @@ export type TestcaseJudgeInput = {
   expectedOutputCount?: number;
 };
 
+function normalizeListLikeOutput(output: unknown[]): unknown[] {
+  return output.map((value) =>
+    value === null || value === undefined ? null : String(value),
+  );
+}
+
 export function normalizeOutputForComparison(
   output: unknown,
   outputType?: QuestionOutputType,
@@ -21,6 +27,18 @@ export function normalizeOutputForComparison(
         Array.isArray(item) ? [...item].map(String).sort().join('|') : String(item),
       )
       .sort();
+  }
+
+  if (outputType === 'linked_list' && Array.isArray(output)) {
+    return normalizeListLikeOutput(output);
+  }
+
+  if (outputType === 'tree' && Array.isArray(output)) {
+    return normalizeListLikeOutput(output);
+  }
+
+  if (outputType === 'count_only' && Array.isArray(output)) {
+    return output.length;
   }
 
   return output;

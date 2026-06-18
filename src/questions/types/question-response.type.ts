@@ -129,11 +129,17 @@ export function buildJudgingInfo(
       'Array outputs are compared after sorting (order does not matter).',
     unordered_nested_array:
       'Nested array outputs are normalized and sorted before comparison.',
+    linked_list:
+      'Linked list outputs are compared as ordered value arrays (head to tail).',
+    tree: 'Tree outputs are compared as level-order array representations.',
+    count_only:
+      'Outputs are validated by result count (length) rather than full value comparison.',
   };
 
   return {
     outputType: resolvedOutputType,
-    supportsCountOnlyValidation: summary.countOnly > 0,
+    supportsCountOnlyValidation:
+      summary.countOnly > 0 || resolvedOutputType === 'count_only',
     comparisonNote: comparisonNotes[resolvedOutputType],
   };
 }
