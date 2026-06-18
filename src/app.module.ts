@@ -6,6 +6,7 @@ import { MongoDBModule } from './mongodb/mongodb.module';
 import { PrismaModule } from './prisma/prisma.module';
 import { ProfileModule } from './profile/profile.module';
 import { QuestionsModule } from './questions/questions.module';
+import { SubmissionsModule } from './submissions/submissions.module';
 import configuration from './config/configuration';
 
 @Module({
@@ -21,6 +22,7 @@ import configuration from './config/configuration';
     HealthModule,
     ProfileModule,
     QuestionsModule,
+    SubmissionsModule,
   ],
 })
 export class AppModule {}

@@ -68,6 +68,15 @@ export class GlobalExceptionFilter implements ExceptionFilter {
       };
     }
 
+    if (this.isPrismaConnectionError(exception)) {
+      return {
+        status: HttpStatus.SERVICE_UNAVAILABLE,
+        error: 'Service Unavailable',
+        message:
+          'PostgreSQL is unavailable. Check DATABASE_URL and ensure Postgres is running.',
+      };
+    }
+
     return {
       status: HttpStatus.INTERNAL_SERVER_ERROR,
       error: 'Internal Server Error',
@@ -105,5 +114,24 @@ export class GlobalExceptionFilter implements ExceptionFilter {
     }
 
     return 'MongoDB operation failed';
+  }
+
+  private isPrismaConnectionError(exception: unknown): boolean {
+    if (typeof exception !== 'object' || exception === null) {
+      return false;
+    }
+
+    const error = exception as { code?: string; message?: string };
+    const connectionCodes = new Set(['P1000', 'P1001', 'P1008', 'P1017']);
+    if (error.code && connectionCodes.has(error.code)) {
+      return true;
+    }
+
+    const message = error.message ?? '';
+    return (
+      message.includes('ECONNREFUSED') ||
+      message.includes("Can't reach database server") ||
+      message.includes('Connection terminated')
+    );
   }
 }
