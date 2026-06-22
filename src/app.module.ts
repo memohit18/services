@@ -10,6 +10,7 @@ import { QuestionsModule } from './questions/questions.module';
 import { SubmissionsModule } from './submissions/submissions.module';
 import { UserProgressModule } from './user-progress/user-progress.module';
 import { RoadmapsModule } from './roadmaps/roadmaps.module';
+import { FitforgeModule } from './fitforge/fitforge.module';
 import configuration from './config/configuration';
 
 @Module({
@@ -29,6 +30,7 @@ import configuration from './config/configuration';
     SubmissionsModule,
     UserProgressModule,
     RoadmapsModule,
+    FitforgeModule,
   ],
 })
 export class AppModule {}

@@ -1,14 +1,82 @@
 # Services
 
-A [NestJS](https://nestjs.com/) backend for the coding platform — questions, test cases, examples, hints, and user profile. It shares the platform database schema via the [`db-schema`](https://github.com/memohit18/db-schema) Git submodule (same source of truth as `auth-service`).
+A [NestJS](https://nestjs.com/) backend for the coding platform and **FitForge AI** fitness transformation APIs. It shares the platform database schema via the [`db-schema`](https://github.com/memohit18/db-schema) Git submodule (same source of truth as `auth-service`).
 
-**Default base URL:** `http://localhost:3303`
+**Default base URL:** `http://localhost:3303`  
+**Swagger docs:** `http://localhost:3303/api/docs`
 
 Authentication is handled by **auth-service** (`http://localhost:3302`). This service only validates JWT access tokens and loads users from PostgreSQL.
 
 ---
 
-## What this service does
+## FitForge AI APIs
+
+FitForge modules cover onboarding → transformation → diet → meals → grocery → workouts → progress → check-ins → uploads.
+
+| Module | Base path | Notes |
+|--------|-----------|-------|
+| Fitness Profile | `/fitness-profile` | CRUD + `/metrics` (BMI, BMR, TDEE) |
+| Physique Goals | `/physique-goals` | Auto-seeded; admin can create |
+| Food Preferences | `/food-preferences` | Includes `/bulk` |
+| Food Catalog | `/foods` | Admin CRUD; search with pagination |
+| Transformation | `/transformation` | Formula-based plan + milestones |
+| Diet | `/diet` | Versioning + activate |
+| Meal Plans | `/meal-plans` | Schedule + items CRUD |
+| Meal Tracking | `/meal-logs` | completed / skipped / replaced |
+| Grocery | `/grocery` | Generate from active meal plan |
+| Workouts | `/workouts` | Versioning + activate |
+| Progress | `/progress` | Logs + `/analytics` |
+| Checkins | `/checkins` | Daily check-in + `/stats` |
+| Uploads | `/uploads` | Cloudflare R2 presigned URLs |
+| Cache | `/cache` | Clear user or all FitForge Redis keys |
+
+**Common response shape:**
+
+```json
+{
+  "success": true,
+  "message": "Success",
+  "data": {}
+}
+```
+
+**Redis cache keys** (see `db-schema/redis/cache-keys.ts`):
+
+| Key pattern | TTL |
+|-------------|-----|
+| `fitforge:fitness-profile:{userId}` | 15 min |
+| `fitforge:transformation:active:{userId}` | 10 min |
+| `fitforge:diet:active:{userId}` | 10 min |
+| `fitforge:meal-plan:active:{userId}` | 10 min |
+| `fitforge:workout:active:{userId}` | 10 min |
+
+Clear cache: `DELETE /cache/me` (current user) or `POST /cache/clear-all` (admin).
+
+**Suggested onboarding flow:**
+
+1. `GET /physique-goals` → pick `physiqueGoalId`
+2. `POST /fitness-profile`
+3. `GET /fitness-profile/metrics`
+4. `POST /transformation/generate`
+5. `POST /diet` → `POST /diet/:id/activate`
+6. `POST /meal-plans` → add items → activate meal plan in app logic
+7. `POST /grocery/generate`
+
+### Postman
+
+Import the **full project** collection (coding platform + FitForge):
+
+```
+docs/services.postman_collection.json
+```
+
+FitForge-only subset: `docs/fitforge.postman_collection.json`
+
+Set collection variable `accessToken` with your JWT from auth-service.
+
+---
+
+## What this service does (coding platform)
 
 | Feature | Endpoint | Use case |
 |---------|----------|----------|
@@ -25,8 +93,10 @@ Authentication is handled by **auth-service** (`http://localhost:3302`). This se
 
 - Node.js v20+
 - npm
-- PostgreSQL (users via Prisma — shared with auth-service)
+- PostgreSQL (users + FitForge tables via Prisma — shared with auth-service)
 - MongoDB database `dsa_tracker` (or your own DB name in `MONGODB_URL`)
+- Redis (optional but recommended for FitForge caching — set `REDIS_URL`)
+- Cloudflare R2 credentials (optional — for `/uploads` presigned URLs)
 - Git SSH access to `git@github.com:memohit18/db-schema.git`
 - Running **auth-service** for JWT tokens
 
@@ -95,6 +165,12 @@ Copy `.env.example` to `.env` and set values locally.
 | `PORT` | No | HTTP port (default `3303`) |
 | `DATABASE_URL` | Yes | PostgreSQL connection string |
 | `MONGODB_URL` | Yes | MongoDB connection string |
+| `REDIS_URL` | No | Redis URL for FitForge caching (e.g. `redis://localhost:6379`) |
+| `R2_ACCOUNT_ID` | No | Cloudflare account ID for R2 uploads |
+| `R2_ACCESS_KEY_ID` | No | R2 access key |
+| `R2_SECRET_ACCESS_KEY` | No | R2 secret key |
+| `R2_BUCKET` | No | R2 bucket name |
+| `R2_PUBLIC_URL` | No | Public base URL for uploaded files |
 | `JWT_ACCESS_SECRET` | Yes | Must match auth-service |
 | `JWT_REFRESH_SECRET` | Yes | Must match auth-service |
 | `JWT_ACCESS_EXPIRES_IN` | No | Default `15m` |
@@ -562,16 +638,35 @@ npm run prisma:generate
 
 ```
 src/
-├── auth/           # Global JWT guard + middleware
-├── common/         # Exception filter, current-user decorator
-├── config/         # Environment configuration
-├── health/         # GET /health
-├── profile/        # GET /profile
-├── questions/      # List, detail, bulk upload
-├── prisma/         # PostgreSQL client
-└── mongodb/        # MongoDB connection + schema registration
-db-schema/          # Git submodule (shared schemas)
-docs/               # Postman collection
+├── auth/                 # Global JWT guard + middleware (legacy)
+├── common/               # Shared decorators, guards, filters, DTOs
+├── config/
+├── health/
+├── profile/              # Legacy user profile
+├── questions/            # Legacy coding platform
+├── submissions/
+├── user-progress/
+├── roadmaps/
+├── activity-logs/
+├── prisma/
+├── mongodb/
+├── fitforge/             # FitForge AI (new APIs — structured by use case)
+│   ├── fitforge.module.ts
+│   ├── infrastructure/   # Redis, cache
+│   │   ├── redis/
+│   │   └── cache/routes/
+│   ├── shared/utils/     # BMI/BMR calculators, normalizers
+│   ├── onboarding/       # Profile, goals, food prefs, catalog
+│   │   ├── fitness-profile/{routes,services,dto}/
+│   │   ├── physique-goals/
+│   │   ├── food-preferences/
+│   │   └── foods/
+│   ├── planning/         # Transformation, diet, meals, grocery
+│   ├── tracking/         # Meal logs, progress, check-ins
+│   ├── training/         # Workouts
+│   └── media/            # Cloudflare R2 uploads
+db-schema/
+docs/                     # Postman collections
 ```
 
 ---
