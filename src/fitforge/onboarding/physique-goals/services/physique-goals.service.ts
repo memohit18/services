@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException, OnModuleInit } from '@nestjs/common';
+import { Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../../../../prisma/prisma.service';
 import {
   FitForgeCacheKeys,
@@ -17,28 +17,25 @@ const SEED_GOALS: Omit<CreatePhysiqueGoalDto, 'imageUrl'>[] = [
 ];
 
 @Injectable()
-export class PhysiqueGoalsService implements OnModuleInit {
+export class PhysiqueGoalsService {
+  private readonly logger = new Logger(PhysiqueGoalsService.name);
+  private seedChecked = false;
+
   constructor(
     private readonly prisma: PrismaService,
     private readonly redis: RedisService,
   ) {}
 
-  async onModuleInit() {
-    const count = await this.prisma.physiqueGoal.count();
-    if (count === 0) {
-      await this.prisma.physiqueGoal.createMany({
-        data: SEED_GOALS,
-      });
-    }
-  }
-
   async create(dto: CreatePhysiqueGoalDto) {
     const goal = await this.prisma.physiqueGoal.create({ data: dto });
     await this.redis.del(FitForgeCacheKeys.physiqueGoals());
+    this.seedChecked = true;
     return goal;
   }
 
   async findAll() {
+    await this.ensureSeeded();
+
     const cacheKey = FitForgeCacheKeys.physiqueGoals();
     const cached = await this.redis.get(cacheKey);
     if (cached) {
@@ -53,10 +50,27 @@ export class PhysiqueGoalsService implements OnModuleInit {
   }
 
   async findOne(id: string) {
+    await this.ensureSeeded();
+
     const goal = await this.prisma.physiqueGoal.findUnique({ where: { id } });
     if (!goal) {
       throw new NotFoundException('Physique goal not found');
     }
     return goal;
+  }
+
+  /** Seed reference goals on first read — avoids blocking app boot if DB is not up yet. */
+  private async ensureSeeded() {
+    if (this.seedChecked) {
+      return;
+    }
+
+    const count = await this.prisma.physiqueGoal.count();
+    if (count === 0) {
+      await this.prisma.physiqueGoal.createMany({ data: SEED_GOALS });
+      this.logger.log(`Seeded ${SEED_GOALS.length} physique goals`);
+    }
+
+    this.seedChecked = true;
   }
 }
