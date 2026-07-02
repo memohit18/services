@@ -32,7 +32,7 @@
     "start:prod": "dotenv -e .env -- node dist/main",
     "questions:set-time-limits": "dotenv -e .env -- ts-node --transpile-only scripts/set-question-time-limits.ts",
     "questions:backfill-time-limits": "dotenv -e .env -- ts-node --transpile-only scripts/backfill-question-time-limits.ts",
-    "llm:test": "dotenv -e .env -- ts-node --transpile-only scripts/test-llm-providers.ts",
+    "questions:validate-testcases": "dotenv -e .env -- ts-node --transpile-only scripts/validate-question-testcases.ts",
     "lint": "eslint \"src/**/*.ts\" --fix"
   },
   "dependencies": {

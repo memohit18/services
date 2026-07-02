@@ -1,5 +1,9 @@
 import type { QuestionOutputType } from '../../../db-schema/mongodb/schemas/question.schema';
 import type { TestCaseValidationType } from '../../../db-schema/mongodb/schemas/test-case.schema';
+import {
+  isIndexPairSumAnswer,
+  looksLikeIndexPairInput,
+} from './index-pair-judge.util';
 
 export type TestcaseJudgeInput = {
   validationType?: TestCaseValidationType;
@@ -48,6 +52,7 @@ export function compareTestcaseOutput(
   userOutput: unknown,
   testcase: TestcaseJudgeInput,
   questionOutputType?: QuestionOutputType,
+  input?: Record<string, unknown>,
 ): boolean {
   const validationType = testcase.validationType ?? 'exact';
 
@@ -65,7 +70,20 @@ export function compareTestcaseOutput(
     questionOutputType,
   );
 
-  return deepEqual(normalizedUser, normalizedExpected);
+  if (deepEqual(normalizedUser, normalizedExpected)) {
+    return true;
+  }
+
+  // Two Sum-style: accept any valid index pair that sums to target.
+  if (
+    input &&
+    looksLikeIndexPairInput(input) &&
+    isIndexPairSumAnswer(input, userOutput)
+  ) {
+    return true;
+  }
+
+  return false;
 }
 
 function deepEqual(left: unknown, right: unknown): boolean {

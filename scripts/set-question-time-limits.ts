@@ -6,14 +6,22 @@
  *   npm run questions:set-time-limits -- --dry-run
  *   npm run questions:set-time-limits -- --force
  *   npm run questions:set-time-limits -- --question-id=1
- *   npm run questions:set-time-limits -- --batch-size=20 --delay-ms=3000
+ *   npm run questions:set-time-limits -- --validate-testcases
+ *   npm run questions:set-time-limits -- --validate-testcases --fix-testcases
  *
  * Requires: MONGODB_URL and at least one of GEMINI_API_KEY or GROK_API_KEY
  * Optional: LLM_PROVIDER_ORDER, GEMINI_MODEL, GROK_MODEL, LLM_MAX_RETRIES
  */
 import mongoose from 'mongoose';
+import { ConfigService } from '@nestjs/config';
 import { createLlmClientFromEnv } from '../src/common/ai/create-llm-client';
 import { loadLlmConfigFromEnv } from '../src/common/ai/llm.config';
+import { CodeRunnerService } from '../src/submissions/judging/code-runner.service';
+import {
+  auditQuestionTestcases,
+  applyTestcaseFixes,
+  REFERENCE_SOLUTIONS,
+} from './validate-question-testcases.lib';
 import {
   chunkArray,
   fetchQuestionsWithTestCounts,
@@ -188,6 +196,42 @@ async function main() {
     console.log('');
     logSummary(results);
     console.log(`elapsed: ${((Date.now() - startedAt) / 1000).toFixed(1)}s`);
+
+    if (options.validateTestcases) {
+      console.log('');
+      console.log('─'.repeat(72));
+      console.log('Testcase validation (reference solutions)');
+      console.log('─'.repeat(72));
+
+      const runner = new CodeRunnerService(new ConfigService({ CODE_RUN_TIMEOUT_MS: '5000' }));
+      const questionIds = options.questionId
+        ? [options.questionId]
+        : [...new Set(questions.map((q) => q.questionId))].filter((id) =>
+            REFERENCE_SOLUTIONS[id],
+          );
+
+      for (const qid of questionIds) {
+        try {
+          const audit = await auditQuestionTestcases(qid, runner);
+          console.log(`#${audit.questionId} ${audit.title}: ${audit.issues.length} issue(s)`);
+          for (const issue of audit.issues) {
+            console.log(`  tc ${issue.index} [${issue.issue}] ${issue.detail}`);
+          }
+
+          if (options.fixTestcases && audit.issues.length > 0) {
+            const fixed = await applyTestcaseFixes(audit.issues, {
+              fixExpected: true,
+              fixAmbiguousInput: true,
+            });
+            console.log(`  fixed ${fixed} testcase(s)`);
+          }
+        } catch (error) {
+          console.log(
+            `  #${qid} skipped: ${error instanceof Error ? error.message : String(error)}`,
+          );
+        }
+      }
+    }
   } finally {
     await mongoose.disconnect();
     console.log('disconnected from MongoDB');

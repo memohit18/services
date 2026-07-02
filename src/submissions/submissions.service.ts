@@ -95,6 +95,7 @@ export class SubmissionsService {
     return {
       ...formatted,
       question: questionContext,
+      testCases: judgeResult.testCases,
       ...(judgeResult.failureReason
         ? { failureReason: judgeResult.failureReason }
         : {}),

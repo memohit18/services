@@ -1,8 +1,31 @@
 import type { SubmissionStatus } from '../../../db-schema/mongodb/schemas/submission.schema';
+import type { TestCaseValidationType } from '../../../db-schema/mongodb/schemas/test-case.schema';
 import type {
   QuestionJudgingResponse,
   QuestionTestcaseSummary,
 } from '../../questions/types/question-response.type';
+
+export type SubmissionTestCaseResult = {
+  index: number;
+  isSample: boolean;
+  isHidden: boolean;
+  input: unknown;
+  validationType: TestCaseValidationType;
+  expectedOutput?: unknown;
+  expectedOutputCount?: number;
+  actualOutput?: unknown;
+  passed: boolean;
+  status:
+    | 'passed'
+    | 'wrong_answer'
+    | 'runtime_error'
+    | 'compilation_error'
+    | 'time_limit_exceeded'
+    | 'invalid_input'
+    | 'skipped';
+  executionTimeMs: number;
+  message?: string;
+};
 
 export type SubmissionQuestionContext = {
   questionId: number;
@@ -29,6 +52,8 @@ export type SubmissionResponse = {
 
 export type SubmissionCreateResponse = SubmissionResponse & {
   question: SubmissionQuestionContext;
+  /** Per-testcase results (sample + hidden) */
+  testCases: SubmissionTestCaseResult[];
   /** Present when status is not Accepted — helps debug judge failures */
   failureReason?: string;
 };

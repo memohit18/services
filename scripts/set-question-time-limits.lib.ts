@@ -49,6 +49,8 @@ export type ScriptOptions = {
   questionId?: number;
   delayMs: number;
   batchSize: number;
+  validateTestcases: boolean;
+  fixTestcases: boolean;
 };
 
 export function parseArgs(argv: string[]): ScriptOptions {
@@ -57,6 +59,8 @@ export function parseArgs(argv: string[]): ScriptOptions {
     force: argv.includes('--force'),
     delayMs: 3000,
     batchSize: 20,
+    validateTestcases: argv.includes('--validate-testcases'),
+    fixTestcases: argv.includes('--fix-testcases'),
   };
 
   const questionArg = argv.find((arg) => arg.startsWith('--question-id='));

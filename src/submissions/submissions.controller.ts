@@ -23,7 +23,8 @@ export class SubmissionsController {
 
   @Post()
   @ApiOperation({
-    summary: 'Submit solution — server runs all test cases (including hidden)',
+    summary:
+      'Submit solution — server runs all test cases and returns per-testcase results (including hidden)',
   })
   create(
     @Param('questionId', ParseIntPipe) questionId: number,
