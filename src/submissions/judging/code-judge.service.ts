@@ -2,8 +2,8 @@ import { Injectable, NotFoundException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
+import { DEFAULT_QUESTION_TIME_LIMIT_MS } from '../../../db-schema/mongodb/constants/question.constants';
 import {
-  DEFAULT_QUESTION_TIME_LIMIT_MS,
   QUESTION_MODEL,
   QuestionDocument,
 } from '../../../db-schema/mongodb/schemas/question.schema';

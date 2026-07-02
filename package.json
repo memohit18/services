@@ -22,7 +22,7 @@
     "prisma:migrate": "dotenv -e .env -- prisma migrate dev",
     "prisma:migrate:deploy": "dotenv -e .env -- prisma migrate deploy",
     "prisma:prepare": "npm run prisma:generate && npm run prisma:migrate:deploy",
-    "prebuild": "npm run prisma:generate",
+    "prebuild": "npm run submodule:init && npm run prisma:generate",
     "postinstall": "npm run submodule:init && npm run prisma:generate",
     "build": "nest build",
     "format": "prettier --write \"src/**/*.ts\"",

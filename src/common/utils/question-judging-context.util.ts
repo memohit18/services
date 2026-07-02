@@ -1,6 +1,6 @@
 import type { Model } from 'mongoose';
 import type { QuestionDocument } from '../../../db-schema/mongodb/schemas/question.schema';
-import { DEFAULT_QUESTION_TIME_LIMIT_MS } from '../../../db-schema/mongodb/schemas/question.schema';
+import { DEFAULT_QUESTION_TIME_LIMIT_MS } from '../../../db-schema/mongodb/constants/question.constants';
 import type { TestCaseDocument } from '../../../db-schema/mongodb/schemas/test-case.schema';
 import {
   buildJudgingInfo,
