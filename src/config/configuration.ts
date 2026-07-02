@@ -28,6 +28,7 @@ export default () => ({
       process.env.DEFAULT_QUESTION_TIME_LIMIT_MS ?? '2000',
       10,
     ),
+    pythonBin: process.env.PYTHON_BIN,
   },
   llm: {
     providerOrder: process.env.LLM_PROVIDER_ORDER ?? 'gemini,grok',

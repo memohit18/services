@@ -95,6 +95,9 @@ export class SubmissionsService {
     return {
       ...formatted,
       question: questionContext,
+      ...(judgeResult.failureReason
+        ? { failureReason: judgeResult.failureReason }
+        : {}),
     };
   }
 
@@ -191,7 +194,7 @@ export class SubmissionsService {
       questionId: submission.questionId,
       language: submission.language,
       code: submission.code,
-      status: submission.status,
+      status: submission.status ?? 'Runtime Error',
       passedTestCases: submission.passedTestCases ?? 0,
       totalTestCases: submission.totalTestCases ?? 0,
       executionTime: submission.executionTime,

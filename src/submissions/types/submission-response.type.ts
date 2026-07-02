@@ -29,6 +29,8 @@ export type SubmissionResponse = {
 
 export type SubmissionCreateResponse = SubmissionResponse & {
   question: SubmissionQuestionContext;
+  /** Present when status is not Accepted — helps debug judge failures */
+  failureReason?: string;
 };
 
 export type SubmissionListResponse = {

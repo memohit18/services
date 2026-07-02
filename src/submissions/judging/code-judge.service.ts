@@ -14,6 +14,7 @@ import {
 } from '../../../db-schema/mongodb/schemas/test-case.schema';
 import { compareTestcaseOutput } from '../../common/utils/testcase-judge.util';
 import { CodeRunnerService } from './code-runner.service';
+import { normalizeJudgeInput } from './normalize-judge-input.util';
 import type { JudgeSubmissionResult } from './judge.types';
 
 @Injectable()
@@ -63,15 +64,27 @@ export class CodeJudgeService {
     let passedTestCases = 0;
     let maxExecutionTime = 0;
     let status: SubmissionStatus = 'Accepted';
+    let failureReason: string | undefined;
 
     for (const testcase of testcases) {
-      const runResult = await this.codeRunner.run(language, code, testcase.input, {
+      let input: Record<string, unknown>;
+      try {
+        input = normalizeJudgeInput(testcase.input);
+      } catch (error) {
+        status = 'Runtime Error';
+        failureReason =
+          error instanceof Error ? error.message : 'Invalid testcase input';
+        break;
+      }
+
+      const runResult = await this.codeRunner.run(language, code, input, {
         timeoutMs: timeLimitMs,
       });
       maxExecutionTime = Math.max(maxExecutionTime, runResult.executionTimeMs);
 
       if (!runResult.ok) {
         status = this.mapErrorToStatus(runResult.errorType);
+        failureReason = runResult.message;
         break;
       }
 
@@ -87,6 +100,7 @@ export class CodeJudgeService {
 
       if (!passed) {
         status = 'Wrong Answer';
+        failureReason = 'Output did not match expected result';
         break;
       }
 
@@ -95,6 +109,7 @@ export class CodeJudgeService {
 
     if (status === 'Accepted' && passedTestCases < testcases.length) {
       status = 'Wrong Answer';
+      failureReason ??= 'Not all test cases passed';
     }
 
     return {
@@ -102,6 +117,7 @@ export class CodeJudgeService {
       passedTestCases,
       totalTestCases: testcases.length,
       executionTime: maxExecutionTime,
+      failureReason,
     };
   }
 

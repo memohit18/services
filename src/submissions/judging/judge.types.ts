@@ -19,6 +19,8 @@ export type JudgeSubmissionResult = {
   totalTestCases: number;
   executionTime: number;
   memoryUsed?: number;
+  /** First failure message when status is not Accepted */
+  failureReason?: string;
 };
 
 export type JudgeContext = {

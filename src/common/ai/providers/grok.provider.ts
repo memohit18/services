@@ -180,9 +180,11 @@ export class GrokProvider implements LlmProviderAdapter {
         error?: { message?: string };
       };
       try {
-        payload = raw ? (JSON.parse(raw) as T & { error?: { message?: string } }) : ({} as T);
+        payload = raw
+          ? (JSON.parse(raw) as T & { error?: { message?: string } })
+          : ({} as T & { error?: { message?: string } });
       } catch {
-        payload = {} as T;
+        payload = {} as T & { error?: { message?: string } };
       }
 
       if (!response.ok) {

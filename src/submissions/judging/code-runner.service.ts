@@ -191,6 +191,51 @@ export class CodeRunnerService {
       };
     }
 
+    const commands = this.getPythonCommands();
+    let lastResult: RunCodeResult | null = null;
+
+    for (const command of commands) {
+      const result = await this.runPythonWithCommand(
+        command,
+        code,
+        input,
+        timeoutMs,
+      );
+
+      if (result.ok || result.errorType !== 'compilation') {
+        return result;
+      }
+
+      lastResult = result;
+    }
+
+    return (
+      lastResult ?? {
+        ok: false,
+        errorType: 'compilation',
+        message: 'Python is not available on the server (install python3)',
+        executionTimeMs: 0,
+      }
+    );
+  }
+
+  private getPythonCommands(): string[] {
+    const configured =
+      this.config.get<string>('codeRunner.pythonBin') ??
+      this.config.get<string>('PYTHON_BIN');
+    if (configured?.trim()) {
+      return [configured.trim()];
+    }
+
+    return ['python3', 'python'];
+  }
+
+  private async runPythonWithCommand(
+    command: string,
+    code: string,
+    input: unknown,
+    timeoutMs?: number,
+  ): Promise<RunCodeResult> {
     const startedAt = Date.now();
     const workDir = await mkdtemp(join(tmpdir(), 'judge-python-'));
 
@@ -199,7 +244,7 @@ export class CodeRunnerService {
       await writeFile(join(workDir, 'runner.py'), PYTHON_RUNNER, 'utf8');
 
       const execution = await this.spawnProcess(
-        'python3',
+        command,
         ['runner.py'],
         workDir,
         JSON.stringify({ input }),
@@ -207,10 +252,32 @@ export class CodeRunnerService {
       );
       const executionTimeMs = Date.now() - startedAt;
 
-      return this.parseRunnerOutput(execution, executionTimeMs);
+      const result = this.parseRunnerOutput(execution, executionTimeMs);
+      if (
+        !result.ok &&
+        result.errorType === 'compilation' &&
+        this.isMissingPythonCommand(execution.stderr, command)
+      ) {
+        return {
+          ...result,
+          message: `${command} not found on server`,
+        };
+      }
+
+      return result;
     } finally {
       await rm(workDir, { recursive: true, force: true });
     }
+  }
+
+  private isMissingPythonCommand(stderr: string, command: string): boolean {
+    const message = stderr.toLowerCase();
+    return (
+      message.includes('enoent') ||
+      message.includes('not found') ||
+      message.includes(`'${command}'`) ||
+      message.includes(`"${command}"`)
+    );
   }
 
   private async runJavaScript(
