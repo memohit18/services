@@ -21,10 +21,7 @@ export type UserProgressResponse = {
 export type UserProgressListResponse = {
   items: UserProgressResponse[];
   meta: {
-    page: number;
-    limit: number;
     total: number;
-    totalPages: number;
     appliedFilters: {
       status?: string;
     };

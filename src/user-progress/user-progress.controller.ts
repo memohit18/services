@@ -1,3 +1,4 @@
+import { ApiOperation } from '@nestjs/swagger';
 import {
   Body,
   Controller,
@@ -13,6 +14,7 @@ import { CurrentUser } from '../common/decorators/current-user.decorator';
 import type { CurrentUserPayload } from '../common/decorators/current-user.decorator';
 import { getRequestMetadata } from '../common/utils/request-metadata.util';
 import { ListUserProgressQueryDto } from './dto/list-user-progress-query.dto';
+import { DailyActivityQueryDto } from './dto/daily-activity-query.dto';
 import { UpdateUserProgressDto } from './dto/update-user-progress.dto';
 import { UserProgressService } from './user-progress.service';
 
@@ -31,6 +33,17 @@ export class UserProgressController {
   @Get('filters')
   getFilters(@CurrentUser() user: CurrentUserPayload) {
     return this.userProgressService.getFilterSummary(user.userId);
+  }
+
+  @Get('daily-activity')
+  @ApiOperation({
+    summary: 'Monthly daily activity — true if the user submitted at least one question that day',
+  })
+  getDailyActivity(
+    @CurrentUser() user: CurrentUserPayload,
+    @Query() query: DailyActivityQueryDto,
+  ) {
+    return this.userProgressService.getDailyActivity(user.userId, query.month);
   }
 
   @Get(':questionId')

@@ -1,10 +1,14 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
 import {
   QUESTION_MODEL,
   QuestionDocument,
 } from '../../db-schema/mongodb/schemas/question.schema';
+import {
+  SUBMISSION_MODEL,
+  SubmissionDocument,
+} from '../../db-schema/mongodb/schemas/submission.schema';
 import {
   USER_PROGRESS_MODEL,
   USER_PROGRESS_STATUSES,
@@ -19,11 +23,18 @@ import {
 } from '../activity-logs/types/activity-log.types';
 import { ListUserProgressQueryDto } from './dto/list-user-progress-query.dto';
 import { UpdateUserProgressDto } from './dto/update-user-progress.dto';
+import type { DailyActivityResponse } from './types/daily-activity-response.type';
 import {
   defaultUserProgress,
   type UserProgressListResponse,
   type UserProgressResponse,
 } from './types/user-progress-response.type';
+import {
+  currentMonthKeyUtc,
+  getMonthBoundsUtc,
+  listDaysInMonth,
+  parseMonthKey,
+} from './utils/month-calendar.util';
 
 @Injectable()
 export class UserProgressService {
@@ -32,15 +43,70 @@ export class UserProgressService {
     private readonly userProgressModel: Model<UserProgressDocument>,
     @InjectModel(QUESTION_MODEL)
     private readonly questionModel: Model<QuestionDocument>,
+    @InjectModel(SUBMISSION_MODEL)
+    private readonly submissionModel: Model<SubmissionDocument>,
     private readonly activityLogsService: ActivityLogsService,
   ) {}
+
+  async getDailyActivity(
+    userId: string,
+    monthKey?: string,
+  ): Promise<DailyActivityResponse> {
+    const resolvedMonthKey = monthKey ?? currentMonthKeyUtc();
+    const { year, month } = parseMonthKey(resolvedMonthKey);
+
+    if (!Number.isFinite(year) || !Number.isFinite(month) || month < 1 || month > 12) {
+      throw new BadRequestException('month must be in YYYY-MM format');
+    }
+
+    const { start, end } = getMonthBoundsUtc(year, month);
+    const daysInMonth = listDaysInMonth(year, month);
+
+    const activeDayRows = await this.submissionModel.aggregate<{ _id: string }>([
+      {
+        $match: {
+          userId,
+          createdAt: { $gte: start, $lt: end },
+        },
+      },
+      {
+        $group: {
+          _id: {
+            $dateToString: {
+              format: '%Y-%m-%d',
+              date: '$createdAt',
+              timezone: 'UTC',
+            },
+          },
+        },
+      },
+    ]);
+
+    const activeDays = new Set(activeDayRows.map((row) => row._id));
+    const days = daysInMonth.map((date) => ({
+      date,
+      attempted: activeDays.has(date),
+    }));
+
+    return {
+      year,
+      month,
+      monthKey: resolvedMonthKey,
+      startDate: daysInMonth[0],
+      endDate: daysInMonth[daysInMonth.length - 1],
+      timezone: 'UTC',
+      days,
+      summary: {
+        activeDays: days.filter((day) => day.attempted).length,
+        totalDays: days.length,
+      },
+    };
+  }
 
   async findAll(
     userId: string,
     query: ListUserProgressQueryDto,
   ): Promise<UserProgressListResponse> {
-    const page = query.page ?? 1;
-    const limit = query.limit ?? 20;
     const filter: Record<string, unknown> = { userId };
 
     if (query.status) {
@@ -51,8 +117,6 @@ export class UserProgressService {
       this.userProgressModel
         .find(filter)
         .sort({ updatedAt: -1 })
-        .skip((page - 1) * limit)
-        .limit(limit)
         .select('-__v')
         .lean(),
       this.userProgressModel.countDocuments(filter),
@@ -64,10 +128,7 @@ export class UserProgressService {
     return {
       items: enrichedItems,
       meta: {
-        page,
-        limit,
         total,
-        totalPages: Math.ceil(total / limit) || 0,
         appliedFilters: {
           ...(query.status ? { status: query.status } : {}),
         },
