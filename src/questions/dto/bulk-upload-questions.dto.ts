@@ -78,6 +78,11 @@ export class QuestionItemDto {
   outputType?: (typeof QUESTION_OUTPUT_TYPES)[number];
 
   @IsOptional()
+  @IsInt()
+  @Min(100)
+  timeLimitMs?: number;
+
+  @IsOptional()
   @IsArray()
   @ValidateNested({ each: true })
   @Type(() => QuestionExampleDto)

@@ -1,5 +1,6 @@
 import type { Model } from 'mongoose';
 import type { QuestionDocument } from '../../../db-schema/mongodb/schemas/question.schema';
+import { DEFAULT_QUESTION_TIME_LIMIT_MS } from '../../../db-schema/mongodb/schemas/question.schema';
 import type { TestCaseDocument } from '../../../db-schema/mongodb/schemas/test-case.schema';
 import {
   buildJudgingInfo,
@@ -12,6 +13,7 @@ import { getTestcaseSummaryByQuestionIds } from './testcase-summary.util';
 export type QuestionJudgingContext = {
   questionId: number;
   outputType?: string;
+  timeLimitMs: number;
   judging: QuestionJudgingResponse;
   testcaseSummary: QuestionTestcaseSummary;
 };
@@ -44,7 +46,7 @@ export async function getQuestionJudgingContextsByQuestionIds(
   const [questions, summaryByQuestionId] = await Promise.all([
     questionModel
       .find({ questionId: { $in: uniqueQuestionIds } })
-      .select('questionId outputType')
+      .select('questionId outputType timeLimitMs')
       .lean(),
     getTestcaseSummaryByQuestionIds(testCaseModel, uniqueQuestionIds),
   ]);
@@ -58,6 +60,7 @@ export async function getQuestionJudgingContextsByQuestionIds(
     contextByQuestionId.set(question.questionId, {
       questionId: question.questionId,
       outputType: question.outputType,
+      timeLimitMs: question.timeLimitMs ?? DEFAULT_QUESTION_TIME_LIMIT_MS,
       judging: buildJudgingInfo(question.outputType, testcaseSummary),
       testcaseSummary,
     });

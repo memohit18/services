@@ -18,6 +18,7 @@ import {
   HintDocument,
 } from '../../db-schema/mongodb/schemas/hint.schema';
 import {
+  DEFAULT_QUESTION_TIME_LIMIT_MS,
   QUESTION_MODEL,
   QuestionDocument,
 } from '../../db-schema/mongodb/schemas/question.schema';
@@ -584,6 +585,7 @@ export class QuestionsService {
       expectedSpaceComplexity: question.expectedSpaceComplexity,
       tags: question.tags ?? [],
       outputType: question.outputType,
+      timeLimitMs: question.timeLimitMs ?? DEFAULT_QUESTION_TIME_LIMIT_MS,
       followUps: this.resolveFollowUps(related.followUps, question),
       examples: this.resolveExamples(related.examples, question),
       hints: this.resolveHints(related.hints, question),
@@ -832,6 +834,7 @@ type QuestionSourceDocument = {
   expectedSpaceComplexity?: string;
   tags?: string[];
   outputType?: string;
+  timeLimitMs?: number;
   examples?: QuestionExampleResponse[];
   hints?: string[];
   followUps?: string[];

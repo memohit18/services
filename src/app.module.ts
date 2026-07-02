@@ -1,5 +1,6 @@
 import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
+import { LlmModule } from './common/ai/llm.module';
 import { ActivityLogsModule } from './activity-logs/activity-logs.module';
 import { AuthModule } from './auth/auth.module';
 import { HealthModule } from './health/health.module';
@@ -20,6 +21,7 @@ import configuration from './config/configuration';
       envFilePath: '.env',
       load: [configuration],
     }),
+    LlmModule,
     PrismaModule,
     MongoDBModule,
     AuthModule,

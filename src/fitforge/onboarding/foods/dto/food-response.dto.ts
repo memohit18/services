@@ -36,4 +36,13 @@ export class FoodResponseDto {
 
   @ApiProperty()
   createdAt: Date;
+
+  @ApiPropertyOptional()
+  createdByUserId?: string | null;
+
+  @ApiProperty()
+  isCustom: boolean;
+
+  @ApiProperty()
+  isVerified: boolean;
 }

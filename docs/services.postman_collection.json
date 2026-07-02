@@ -1,0 +1,1486 @@
+{
+  "info": {
+    "name": "Services API (FULL)",
+    "description": "# Auth\n`Authorization: Bearer {{accessToken}}`\n\nGet token from auth-service ({{authBaseUrl}}).\n\n# FitForge success envelope\n```json\n{ \"success\": true, \"message\": \"...\", \"data\": { } }\n```\n\n# FitForge paginated list\n```json\n{ \"success\": true, \"message\": \"Success\", \"data\": { \"items\": [], \"meta\": { \"page\", \"limit\", \"total\", \"totalPages\" } } }\n```\n\n# Error envelope (all routes)\n```json\n{ \"statusCode\": 404, \"error\": \"Not Found\", \"message\": \"...\", \"path\": \"/...\", \"timestamp\": \"...\" }\n```\n\n# Legacy routes (questions, profile, etc.)\nReturn raw JSON without the FitForge `success` wrapper.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "http://localhost:3303"
+    },
+    {
+      "key": "authBaseUrl",
+      "value": "http://localhost:3302"
+    },
+    {
+      "key": "accessToken",
+      "value": ""
+    },
+    {
+      "key": "questionId",
+      "value": "1"
+    },
+    {
+      "key": "physiqueGoalId",
+      "value": ""
+    },
+    {
+      "key": "foodId",
+      "value": ""
+    },
+    {
+      "key": "dietPlanId",
+      "value": ""
+    },
+    {
+      "key": "mealPlanId",
+      "value": ""
+    },
+    {
+      "key": "mealPlanItemId",
+      "value": ""
+    },
+    {
+      "key": "transformationId",
+      "value": ""
+    },
+    {
+      "key": "workoutPlanId",
+      "value": ""
+    },
+    {
+      "key": "progressId",
+      "value": ""
+    },
+    {
+      "key": "exerciseId",
+      "value": ""
+    },
+    {
+      "key": "aiSessionId",
+      "value": ""
+    }
+  ],
+  "auth": {
+    "type": "bearer",
+    "bearer": [
+      {
+        "key": "token",
+        "value": "{{accessToken}}",
+        "type": "string"
+      }
+    ]
+  },
+  "item": [
+    {
+      "name": "00 — Common",
+      "description": "Shared response shapes",
+      "item": [
+        {
+          "name": "Error — 401 Unauthorized",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/fitness-profile",
+            "auth": {
+              "type": "noauth"
+            },
+            "description": "Missing or invalid Bearer token"
+          },
+          "response": [
+            {
+              "name": "401",
+              "status": "Unauthorized",
+              "code": 401,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"statusCode\": 401,\n  \"error\": \"Unauthorized\",\n  \"message\": \"Unauthorized\",\n  \"path\": \"/fitness-profile\",\n  \"timestamp\": \"2026-06-22T19:10:35.279Z\"\n}"
+            }
+          ]
+        },
+        {
+          "name": "Error — 404 Not Found",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "disabled": true
+              }
+            ],
+            "url": "{{baseUrl}}/fitness-profile",
+            "description": "Profile not created yet for this user"
+          },
+          "response": [
+            {
+              "name": "404",
+              "status": "Not Found",
+              "code": 404,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"statusCode\": 404,\n  \"error\": \"Not Found\",\n  \"message\": \"Fitness profile not found\",\n  \"path\": \"/fitness-profile\",\n  \"timestamp\": \"2026-06-22T19:10:35.279Z\"\n}"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "01 — Health & Profile (legacy)",
+      "item": [
+        {
+          "name": "GET /health",
+          "request": {
+            "method": "GET",
+            "auth": {
+              "type": "noauth"
+            },
+            "url": "{{baseUrl}}/health",
+            "description": "**Response:** `{ status, postgres, mongodb }` — no auth"
+          },
+          "response": [
+            {
+              "name": "200",
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"status\": \"ok\",\n  \"postgres\": \"up\",\n  \"mongodb\": \"up\"\n}"
+            }
+          ]
+        },
+        {
+          "name": "GET /profile",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "disabled": true
+              }
+            ],
+            "url": "{{baseUrl}}/profile",
+            "description": "**Response:** `{ name, email, phone, avatar, role }` — no success wrapper"
+          },
+          "response": [
+            {
+              "name": "200",
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"name\": \"Mohit\",\n  \"email\": \"user@example.com\",\n  \"phone\": null,\n  \"avatar\": null,\n  \"role\": \"user\"\n}"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "01b — Onboarding",
+      "description": "Tracks where user left off in onboarding flow",
+      "item": [
+        {
+          "name": "GET Progress",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/onboarding",
+            "description": "Creates record on first call"
+          },
+          "response": [
+            {
+              "name": "200",
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [{ "key": "Content-Type", "value": "application/json" }],
+              "body": "{\n  \"success\": true,\n  \"message\": \"Success\",\n  \"data\": {\n    \"currentStep\": 1,\n    \"isCompleted\": false,\n    \"completedAt\": null\n  }\n}"
+            }
+          ]
+        },
+        {
+          "name": "PATCH Step",
+          "request": {
+            "method": "PATCH",
+            "header": [{ "key": "Content-Type", "value": "application/json", "disabled": false }],
+            "url": "{{baseUrl}}/onboarding",
+            "body": { "mode": "raw", "raw": "{\n  \"currentStep\": 3\n}" }
+          },
+          "response": []
+        },
+        {
+          "name": "POST Complete",
+          "request": {
+            "method": "POST",
+            "url": "{{baseUrl}}/onboarding/complete"
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "02 — Fitness Profile",
+      "description": "Onboarding — one profile per user. Create before GET.",
+      "item": [
+        {
+          "name": "POST Create profile",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "disabled": false
+              }
+            ],
+            "url": "{{baseUrl}}/fitness-profile",
+            "description": "**Required:** age, gender, heightCm, weightKg, activityLevel, dietType, fitnessGoal, physiqueGoalId\n\n**Aliases:** moderate→moderately_active, non_veg→non_vegetarian",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"age\": 28,\n  \"gender\": \"male\",\n  \"heightCm\": 175,\n  \"weightKg\": 78,\n  \"activityLevel\": \"moderate\",\n  \"dietType\": \"non_veg\",\n  \"fitnessGoal\": \"muscle_gain\",\n  \"physiqueGoalId\": \"{{physiqueGoalId}}\",\n  \"targetWeightKg\": 85,\n  \"targetBodyFat\": 15,\n  \"workoutDaysPerWeek\": 5,\n  \"experienceLevel\": \"beginner\",\n  \"budgetPreference\": \"moderate\",\n  \"workoutMode\": \"gym\"\n}"
+            }
+          },
+          "response": [
+            {
+              "name": "201",
+              "status": "Created",
+              "code": 201,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"success\": true,\n  \"message\": \"Fitness profile created\",\n  \"data\": {\n    \"id\": \"uuid-profile\",\n    \"userId\": \"eaff0ae6-00da-4e70-b2c3-8e082ea6d4de\",\n    \"age\": 28,\n    \"gender\": \"male\",\n    \"heightCm\": 175,\n    \"weightKg\": 78,\n    \"activityLevel\": \"moderately_active\",\n    \"dietType\": \"non_vegetarian\",\n    \"fitnessGoal\": \"muscle_gain\",\n    \"physiqueGoalId\": \"uuid-physique-goal\",\n    \"targetWeightKg\": 85,\n    \"targetBodyFat\": 15,\n    \"workoutDaysPerWeek\": 5,\n    \"experienceLevel\": \"beginner\",\n    \"allergies\": null,\n    \"budgetPreference\": \"moderate\",\n    \"workoutMode\": \"gym\",\n    \"equipmentAvailable\": null,\n    \"createdAt\": \"2026-06-22T10:00:00.000Z\",\n    \"updatedAt\": \"2026-06-22T10:00:00.000Z\"\n  }\n}"
+            },
+            {
+              "name": "409",
+              "status": "Conflict",
+              "code": 409,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"statusCode\": 409,\n  \"error\": \"Conflict\",\n  \"message\": \"Fitness profile already exists\",\n  \"path\": \"/fitness-profile\",\n  \"timestamp\": \"2026-06-22T19:10:35.279Z\"\n}"
+            }
+          ]
+        },
+        {
+          "name": "GET Profile",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "disabled": true
+              }
+            ],
+            "url": "{{baseUrl}}/fitness-profile",
+            "description": "**Response data:** UserFitnessProfile object"
+          },
+          "response": [
+            {
+              "name": "200",
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"success\": true,\n  \"message\": \"Success\",\n  \"data\": {\n    \"id\": \"uuid-profile\",\n    \"userId\": \"eaff0ae6-00da-4e70-b2c3-8e082ea6d4de\",\n    \"age\": 28,\n    \"gender\": \"male\",\n    \"heightCm\": 175,\n    \"weightKg\": 78,\n    \"activityLevel\": \"moderately_active\",\n    \"dietType\": \"non_vegetarian\",\n    \"fitnessGoal\": \"muscle_gain\",\n    \"physiqueGoalId\": \"uuid-physique-goal\",\n    \"targetWeightKg\": 85,\n    \"targetBodyFat\": 15,\n    \"workoutDaysPerWeek\": 5,\n    \"experienceLevel\": \"beginner\",\n    \"allergies\": null,\n    \"budgetPreference\": \"moderate\",\n    \"workoutMode\": \"gym\",\n    \"equipmentAvailable\": null,\n    \"createdAt\": \"2026-06-22T10:00:00.000Z\",\n    \"updatedAt\": \"2026-06-22T10:00:00.000Z\"\n  }\n}"
+            }
+          ]
+        },
+        {
+          "name": "PUT Update profile",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "disabled": false
+              }
+            ],
+            "url": "{{baseUrl}}/fitness-profile",
+            "description": "Partial update — all fields optional",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"weightKg\": 77,\n  \"workoutDaysPerWeek\": 4\n}"
+            }
+          },
+          "response": [
+            {
+              "name": "200",
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"success\": true,\n  \"message\": \"Fitness profile updated\",\n  \"data\": {\n    \"id\": \"uuid-profile\",\n    \"userId\": \"eaff0ae6-00da-4e70-b2c3-8e082ea6d4de\",\n    \"age\": 28,\n    \"gender\": \"male\",\n    \"heightCm\": 175,\n    \"weightKg\": 77,\n    \"activityLevel\": \"moderately_active\",\n    \"dietType\": \"non_vegetarian\",\n    \"fitnessGoal\": \"muscle_gain\",\n    \"physiqueGoalId\": \"uuid-physique-goal\",\n    \"targetWeightKg\": 85,\n    \"targetBodyFat\": 15,\n    \"workoutDaysPerWeek\": 4,\n    \"experienceLevel\": \"beginner\",\n    \"allergies\": null,\n    \"budgetPreference\": \"moderate\",\n    \"workoutMode\": \"gym\",\n    \"equipmentAvailable\": null,\n    \"createdAt\": \"2026-06-22T10:00:00.000Z\",\n    \"updatedAt\": \"2026-06-22T10:00:00.000Z\"\n  }\n}"
+            }
+          ]
+        },
+        {
+          "name": "GET Metrics",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "disabled": true
+              }
+            ],
+            "url": "{{baseUrl}}/fitness-profile/metrics",
+            "description": "**Response data:** `{ bmi, bmr, tdee, proteinTarget, dailyCalorieTarget }`"
+          },
+          "response": [
+            {
+              "name": "200",
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"success\": true,\n  \"message\": \"Success\",\n  \"data\": {\n    \"bmi\": 25.5,\n    \"bmr\": 1780,\n    \"tdee\": 2600,\n    \"proteinTarget\": 156,\n    \"dailyCalorieTarget\": 2900\n  }\n}"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "03 — Physique Goals",
+      "item": [
+        {
+          "name": "GET List",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "disabled": true
+              }
+            ],
+            "url": "{{baseUrl}}/physique-goals",
+            "description": "Auto-seeds 6 goals on first call. **Response:** array in data"
+          },
+          "response": [
+            {
+              "name": "200",
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"success\": true,\n  \"message\": \"Success\",\n  \"data\": [\n    {\n      \"id\": \"uuid-physique-goal\",\n      \"name\": \"Athletic\",\n      \"description\": \"Lean and functional\",\n      \"targetBodyFatMin\": 12,\n      \"targetBodyFatMax\": 16,\n      \"imageUrl\": null,\n      \"createdAt\": \"2026-06-22T10:00:00.000Z\"\n    }\n  ]\n}"
+            }
+          ]
+        },
+        {
+          "name": "GET By id",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "disabled": true
+              }
+            ],
+            "url": "{{baseUrl}}/physique-goals/{{physiqueGoalId}}",
+            "description": ""
+          },
+          "response": [
+            {
+              "name": "200",
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"success\": true,\n  \"message\": \"Success\",\n  \"data\": {\n    \"id\": \"uuid-physique-goal\",\n    \"name\": \"Athletic\",\n    \"description\": \"Lean and functional\",\n    \"targetBodyFatMin\": 12,\n    \"targetBodyFatMax\": 16,\n    \"imageUrl\": null,\n    \"createdAt\": \"2026-06-22T10:00:00.000Z\"\n  }\n}"
+            }
+          ]
+        },
+        {
+          "name": "POST Create (admin)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "disabled": false
+              }
+            ],
+            "url": "{{baseUrl}}/physique-goals",
+            "description": "Requires role=admin",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Athletic\",\n  \"description\": \"...\",\n  \"targetBodyFatMin\": 12,\n  \"targetBodyFatMax\": 16\n}"
+            }
+          },
+          "response": [
+            {
+              "name": "201",
+              "status": "Created",
+              "code": 201,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"success\": true,\n  \"message\": \"Physique goal created\",\n  \"data\": {\n    \"id\": \"uuid-physique-goal\",\n    \"name\": \"Athletic\",\n    \"description\": \"Lean and functional\",\n    \"targetBodyFatMin\": 12,\n    \"targetBodyFatMax\": 16,\n    \"imageUrl\": null,\n    \"createdAt\": \"2026-06-22T10:00:00.000Z\"\n  }\n}"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "04 — Food Preferences",
+      "item": [
+        {
+          "name": "POST Add",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "disabled": false
+              }
+            ],
+            "url": "{{baseUrl}}/food-preferences",
+            "description": "preferenceType: favorite | available | restricted | allergy",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"foodId\": \"{{foodId}}\",\n  \"preferenceType\": \"favorite\"\n}"
+            }
+          },
+          "response": [
+            {
+              "name": "201",
+              "status": "Created",
+              "code": 201,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"success\": true,\n  \"message\": \"Preference added\",\n  \"data\": {\n    \"id\": \"uuid\",\n    \"userId\": \"...\",\n    \"foodId\": \"{{foodId}}\",\n    \"preferenceType\": \"favorite\",\n    \"createdAt\": \"...\",\n    \"food\": {\n      \"name\": \"Egg\"\n    }\n  }\n}"
+            }
+          ]
+        },
+        {
+          "name": "POST Bulk",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "disabled": false
+              }
+            ],
+            "url": "{{baseUrl}}/food-preferences/bulk",
+            "description": "Replaces all preferences",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"favorites\": [\n    \"{{foodId}}\"\n  ],\n  \"restricted\": [],\n  \"allergies\": []\n}"
+            }
+          },
+          "response": [
+            {
+              "name": "200",
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"success\": true,\n  \"message\": \"Preferences saved\",\n  \"data\": []\n}"
+            }
+          ]
+        },
+        {
+          "name": "GET List",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "disabled": true
+              }
+            ],
+            "url": "{{baseUrl}}/food-preferences",
+            "description": ""
+          },
+          "response": [
+            {
+              "name": "200",
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"success\": true,\n  \"message\": \"Success\",\n  \"data\": []\n}"
+            }
+          ]
+        },
+        {
+          "name": "DELETE",
+          "request": {
+            "method": "DELETE",
+            "url": "{{baseUrl}}/food-preferences/{{foodPreferenceId}}"
+          },
+          "response": [
+            {
+              "name": "200",
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"success\": true,\n  \"message\": \"Preference deleted\",\n  \"data\": {\n    \"id\": \"uuid\"\n  }\n}"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "05 — Foods",
+      "item": [
+        {
+          "name": "POST Custom food",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "disabled": false
+              }
+            ],
+            "url": "{{baseUrl}}/foods/custom",
+            "description": "User-owned food (isCustom=true, isVerified=false)",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Mom's Paneer Curry\",\n  \"category\": \"protein\",\n  \"dietType\": \"veg\",\n  \"servingSize\": \"1 bowl\",\n  \"calories\": 320,\n  \"protein\": 18,\n  \"carbs\": 12,\n  \"fats\": 22\n}"
+            }
+          },
+          "response": [
+            {
+              "name": "201",
+              "status": "Created",
+              "code": 201,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"success\": true,\n  \"message\": \"Custom food created\",\n  \"data\": {\n    \"id\": \"uuid\",\n    \"name\": \"Mom's Paneer Curry\",\n    \"isCustom\": true,\n    \"isVerified\": false,\n    \"createdByUserId\": \"user-uuid\"\n  }\n}"
+            }
+          ]
+        },
+        {
+          "name": "GET Search",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/foods?page=1&limit=20&category=protein&dietType=veg&search=egg",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "foods"
+              ],
+              "query": [
+                {
+                  "key": "page",
+                  "value": "1"
+                },
+                {
+                  "key": "limit",
+                  "value": "20"
+                },
+                {
+                  "key": "category",
+                  "value": "protein"
+                },
+                {
+                  "key": "dietType",
+                  "value": "veg"
+                },
+                {
+                  "key": "search",
+                  "value": "egg"
+                }
+              ]
+            },
+            "description": "Paginated response"
+          },
+          "response": [
+            {
+              "name": "200",
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"success\": true,\n  \"message\": \"Success\",\n  \"data\": {\n    \"items\": [\n      {\n        \"id\": \"uuid\",\n        \"name\": \"Egg\",\n        \"category\": \"protein\",\n        \"calories\": 78,\n        \"protein\": 6,\n        \"carbs\": 0.6,\n        \"fats\": 5\n      }\n    ],\n    \"meta\": {\n      \"page\": 1,\n      \"limit\": 20,\n      \"total\": 1,\n      \"totalPages\": 1\n    }\n  }\n}"
+            }
+          ]
+        },
+        {
+          "name": "POST Create (admin)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "disabled": false
+              }
+            ],
+            "url": "{{baseUrl}}/foods",
+            "description": "",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Egg\",\n  \"category\": \"protein\",\n  \"dietType\": \"eggetarian\",\n  \"servingSize\": \"1 large\",\n  \"calories\": 78,\n  \"protein\": 6,\n  \"carbs\": 0.6,\n  \"fats\": 5\n}"
+            }
+          },
+          "response": [
+            {
+              "name": "201",
+              "status": "Created",
+              "code": 201,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"success\": true,\n  \"message\": \"Food created\",\n  \"data\": {\n    \"id\": \"uuid\",\n    \"name\": \"Egg\"\n  }\n}"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "06 — Transformation",
+      "item": [
+        {
+          "name": "POST Generate",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "disabled": false
+              }
+            ],
+            "url": "{{baseUrl}}/transformation/generate",
+            "description": "Requires fitness profile. Creates TransformationTarget + milestones"
+          },
+          "response": [
+            {
+              "name": "201",
+              "status": "Created",
+              "code": 201,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"success\": true,\n  \"message\": \"Transformation plan generated\",\n  \"data\": {\n    \"id\": \"uuid\",\n    \"userId\": \"...\",\n    \"currentWeightKg\": 78,\n    \"targetWeightKg\": 85,\n    \"estimatedWeeks\": 14,\n    \"status\": \"active\",\n    \"bmi\": 25.5,\n    \"bmr\": 1780,\n    \"tdee\": 2600,\n    \"dailyCalorieTarget\": 2900,\n    \"proteinTarget\": 156,\n    \"milestones\": [\n      {\n        \"weekNumber\": 4,\n        \"status\": \"pending\"\n      }\n    ]\n  }\n}"
+            }
+          ]
+        },
+        {
+          "name": "GET Active",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "disabled": true
+              }
+            ],
+            "url": "{{baseUrl}}/transformation/active",
+            "description": ""
+          },
+          "response": [
+            {
+              "name": "200",
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"success\": true,\n  \"message\": \"Success\",\n  \"data\": {\n    \"id\": \"uuid\",\n    \"status\": \"active\"\n  }\n}"
+            }
+          ]
+        },
+        {
+          "name": "GET History",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "disabled": true
+              }
+            ],
+            "url": "{{baseUrl}}/transformation/history?page=1&limit=20",
+            "description": "Paginated"
+          },
+          "response": [
+            {
+              "name": "200",
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"success\": true,\n  \"message\": \"Success\",\n  \"data\": {\n    \"items\": [\n      {\n        \"id\": \"uuid\",\n        \"status\": \"completed\"\n      }\n    ],\n    \"meta\": {\n      \"page\": 1,\n      \"limit\": 20,\n      \"total\": 1,\n      \"totalPages\": 1\n    }\n  }\n}"
+            }
+          ]
+        },
+        {
+          "name": "GET Milestones",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "disabled": true
+              }
+            ],
+            "url": "{{baseUrl}}/transformation/{{transformationId}}/milestones",
+            "description": ""
+          },
+          "response": [
+            {
+              "name": "200",
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"success\": true,\n  \"message\": \"Success\",\n  \"data\": [\n    {\n      \"weekNumber\": 4,\n      \"targetWeightKg\": 76,\n      \"status\": \"pending\"\n    }\n  ]\n}"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "07 — Diet",
+      "item": [
+        {
+          "name": "POST Generate targets (Gemini)",
+          "request": {
+            "method": "POST",
+            "url": "{{baseUrl}}/diet/generate-targets",
+            "description": "AI reads profile → returns macro targets only"
+          },
+          "response": []
+        },
+        {
+          "name": "POST From targets (manual)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "disabled": false
+              }
+            ],
+            "url": "{{baseUrl}}/diet",
+            "description": "Nutrition targets only — meals live in MealPlan",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"goal\": \"muscle_gain\",\n  \"caloriesTarget\": 2800,\n  \"proteinTarget\": 150,\n  \"carbsTarget\": 320,\n  \"fatsTarget\": 80\n}"
+            }
+          },
+          "response": [
+            {
+              "name": "201",
+              "status": "Created",
+              "code": 201,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"success\": true,\n  \"message\": \"Diet plan created\",\n  \"data\": {\n    \"id\": \"uuid\",\n    \"version\": 1,\n    \"status\": \"draft\",\n    \"goal\": \"muscle_gain\",\n    \"caloriesTarget\": 2800,\n    \"proteinTarget\": 150,\n    \"carbsTarget\": 320,\n    \"fatsTarget\": 80\n  }\n}"
+            }
+          ]
+        },
+        {
+          "name": "GET Active",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "disabled": true
+              }
+            ],
+            "url": "{{baseUrl}}/diet/active",
+            "description": ""
+          },
+          "response": [
+            {
+              "name": "200",
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"success\": true,\n  \"message\": \"Success\",\n  \"data\": {\n    \"id\": \"uuid\",\n    \"status\": \"active\",\n    \"version\": 1\n  }\n}"
+            }
+          ]
+        },
+        {
+          "name": "POST Activate",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "disabled": false
+              }
+            ],
+            "url": "{{baseUrl}}/diet/{{dietPlanId}}/activate",
+            "description": "Archives current active, sets this active"
+          },
+          "response": [
+            {
+              "name": "200",
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"success\": true,\n  \"message\": \"Diet plan activated\",\n  \"data\": {\n    \"id\": \"uuid\",\n    \"status\": \"active\"\n  }\n}"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "08 — Meal Plans & Logs",
+      "item": [
+        {
+          "name": "POST Meal plan",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "disabled": false
+              }
+            ],
+            "url": "{{baseUrl}}/meal-plans",
+            "description": "planType: weekly | monthly",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"dietPlanId\": \"{{dietPlanId}}\",\n  \"planType\": \"weekly\"\n}"
+            }
+          },
+          "response": [
+            {
+              "name": "201",
+              "status": "Created",
+              "code": 201,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"success\": true,\n  \"message\": \"Meal plan created\",\n  \"data\": {\n    \"id\": \"uuid\",\n    \"version\": 1,\n    \"planType\": \"weekly\",\n    \"status\": \"draft\"\n  }\n}"
+            }
+          ]
+        },
+        {
+          "name": "POST Meal item",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "disabled": false
+              }
+            ],
+            "url": "{{baseUrl}}/meal-plans/{{mealPlanId}}/items",
+            "description": "mealType: breakfast|lunch|snack|dinner",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"dayNumber\": 1,\n  \"mealType\": \"breakfast\",\n  \"foodId\": \"{{foodId}}\",\n  \"quantity\": 2,\n  \"calories\": 156,\n  \"protein\": 12,\n  \"carbs\": 1.2,\n  \"fats\": 10\n}"
+            }
+          },
+          "response": [
+            {
+              "name": "201",
+              "status": "Created",
+              "code": 201,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"success\": true,\n  \"message\": \"Meal item added\",\n  \"data\": {\n    \"id\": \"uuid\",\n    \"dayNumber\": 1,\n    \"mealType\": \"breakfast\"\n  }\n}"
+            }
+          ]
+        },
+        {
+          "name": "POST Meal log",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "disabled": false
+              }
+            ],
+            "url": "{{baseUrl}}/meal-logs",
+            "description": "status: completed | skipped | replaced (+ replacementFoodId)",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"mealPlanItemId\": \"{{mealPlanItemId}}\",\n  \"status\": \"completed\"\n}"
+            }
+          },
+          "response": [
+            {
+              "name": "201",
+              "status": "Created",
+              "code": 201,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"success\": true,\n  \"message\": \"Meal logged\",\n  \"data\": {\n    \"id\": \"uuid\",\n    \"status\": \"completed\"\n  }\n}"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "09 — Grocery & Workouts",
+      "item": [
+        {
+          "name": "POST Grocery generate",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "disabled": false
+              }
+            ],
+            "url": "{{baseUrl}}/grocery/generate",
+            "description": "From active meal plan"
+          },
+          "response": [
+            {
+              "name": "201",
+              "status": "Created",
+              "code": 201,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"success\": true,\n  \"message\": \"Grocery list generated\",\n  \"data\": {\n    \"id\": \"uuid\",\n    \"items\": [\n      {\n        \"foodId\": \"uuid\",\n        \"name\": \"Egg\",\n        \"quantity\": 14,\n        \"unit\": \"1 large\"\n      }\n    ]\n  }\n}"
+            }
+          ]
+        },
+        {
+          "name": "POST Workout",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "disabled": false
+              }
+            ],
+            "url": "{{baseUrl}}/workouts",
+            "description": "Structured days/exercises — no planJson",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"goal\": \"muscle_gain\",\n  \"daysPerWeek\": 5,\n  \"days\": [\n    {\n      \"dayNumber\": 1,\n      \"title\": \"Push Day\",\n      \"exercises\": [\n        {\n          \"exerciseId\": \"{{exerciseId}}\",\n          \"sets\": 4,\n          \"reps\": \"8-12\",\n          \"restSeconds\": 90\n        }\n      ]\n    }\n  ]\n}"
+            }
+          },
+          "response": [
+            {
+              "name": "201",
+              "status": "Created",
+              "code": 201,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"success\": true,\n  \"message\": \"Workout plan created\",\n  \"data\": {\n    \"id\": \"uuid\",\n    \"version\": 1,\n    \"status\": \"draft\",\n    \"days\": [\n      {\n        \"dayNumber\": 1,\n        \"title\": \"Push Day\",\n        \"exercises\": [\n          {\n            \"sets\": 4,\n            \"reps\": \"8-12\",\n            \"restSeconds\": 90,\n            \"exercise\": { \"name\": \"Bench Press\" }\n          }\n        ]\n      }\n    ]\n  }\n}"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "10 — Progress & Checkins",
+      "item": [
+        {
+          "name": "POST Progress",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "disabled": false
+              }
+            ],
+            "url": "{{baseUrl}}/progress",
+            "description": "",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"weightKg\": 78,\n  \"waistCm\": 82,\n  \"bodyFatPercentage\": 18\n}"
+            }
+          },
+          "response": [
+            {
+              "name": "201",
+              "status": "Created",
+              "code": 201,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"success\": true,\n  \"message\": \"Progress logged\",\n  \"data\": {\n    \"id\": \"uuid\",\n    \"weightKg\": 78\n  }\n}"
+            }
+          ]
+        },
+        {
+          "name": "GET Analytics",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "disabled": true
+              }
+            ],
+            "url": "{{baseUrl}}/progress/analytics",
+            "description": ""
+          },
+          "response": [
+            {
+              "name": "200",
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"success\": true,\n  \"message\": \"Success\",\n  \"data\": {\n    \"weightChange\": -4,\n    \"waistChange\": -5,\n    \"bodyFatChange\": -2,\n    \"goalCompletion\": 42\n  }\n}"
+            }
+          ]
+        },
+        {
+          "name": "POST Checkin",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "disabled": false
+              }
+            ],
+            "url": "{{baseUrl}}/checkins",
+            "description": "One per day",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"weightKg\": 78,\n  \"caloriesConsumed\": 2500,\n  \"proteinConsumed\": 130,\n  \"waterIntakeMl\": 3000,\n  \"mealsCompleted\": 4,\n  \"mealsSkipped\": 0,\n  \"workoutCompleted\": true\n}"
+            }
+          },
+          "response": [
+            {
+              "name": "201",
+              "status": "Created",
+              "code": 201,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"success\": true,\n  \"message\": \"Check-in recorded\",\n  \"data\": {\n    \"id\": \"uuid\",\n    \"dietCompliance\": 100,\n    \"workoutCompleted\": true\n  }\n}"
+            }
+          ]
+        },
+        {
+          "name": "GET Checkin stats",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "disabled": true
+              }
+            ],
+            "url": "{{baseUrl}}/checkins/stats",
+            "description": "Monthly"
+          },
+          "response": [
+            {
+              "name": "200",
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"success\": true,\n  \"message\": \"Success\",\n  \"data\": {\n    \"month\": \"2026-06\",\n    \"totalCheckins\": 20,\n    \"avgDietCompliance\": 85,\n    \"workoutsCompleted\": 18\n  }\n}"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "11 — Uploads & Cache",
+      "item": [
+        {
+          "name": "POST Presigned URL",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "disabled": false
+              }
+            ],
+            "url": "{{baseUrl}}/uploads/presigned-url",
+            "description": "R2 — upload file to uploadUrl, then confirm",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"fileName\": \"front.jpg\",\n  \"contentType\": \"image/jpeg\",\n  \"photoType\": \"front\"\n}"
+            }
+          },
+          "response": [
+            {
+              "name": "201",
+              "status": "Created",
+              "code": 201,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"success\": true,\n  \"message\": \"Presigned URL generated\",\n  \"data\": {\n    \"uploadId\": \"uuid\",\n    \"uploadUrl\": \"https://...\",\n    \"fileUrl\": \"https://...\",\n    \"expiresIn\": 900\n  }\n}"
+            }
+          ]
+        },
+        {
+          "name": "DELETE Cache me",
+          "request": {
+            "method": "DELETE",
+            "url": "{{baseUrl}}/cache/me",
+            "description": "Clears FitForge Redis keys for user"
+          },
+          "response": [
+            {
+              "name": "200",
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"success\": true,\n  \"message\": \"User cache cleared\",\n  \"data\": {\n    \"cleared\": true\n  }\n}"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "12 — AI Coach (Gemini)",
+      "item": [
+        {
+          "name": "POST Create session",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": "{{baseUrl}}/ai/sessions",
+            "body": { "mode": "raw", "raw": "{\n  \"title\": \"Meal help\"\n}" }
+          },
+          "response": []
+        },
+        {
+          "name": "POST Chat (PRD)",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": "{{baseUrl}}/ai/chat",
+            "description": "Injects profile, diet, workout, progress, check-ins + history",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"sessionId\": \"{{aiSessionId}}\",\n  \"message\": \"I skipped breakfast\"\n}"
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "POST Meal plan generate-ai",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": "{{baseUrl}}/meal-plans/generate-ai",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"dietPlanId\": \"{{dietPlanId}}\",\n  \"planType\": \"weekly\",\n  \"days\": 7\n}"
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "POST Workout generate-ai",
+          "request": {
+            "method": "POST",
+            "url": "{{baseUrl}}/workouts/generate-ai"
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "12 — Questions (legacy)",
+      "description": "No success wrapper on responses",
+      "item": [
+        {
+          "name": "GET List",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/questions?page=1&limit=20",
+            "description": "**Response:** `{ items, meta, filters }`"
+          },
+          "response": [
+            {
+              "name": "200",
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"items\": [\n    {\n      \"questionId\": 1,\n      \"title\": \"Two Sum\",\n      \"difficulty\": \"Easy\"\n    }\n  ],\n  \"meta\": {\n    \"page\": 1,\n    \"limit\": 20,\n    \"total\": 100,\n    \"totalPages\": 5\n  }\n}"
+            }
+          ]
+        },
+        {
+          "name": "GET Detail",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "disabled": true
+              }
+            ],
+            "url": "{{baseUrl}}/questions/{{questionId}}",
+            "description": ""
+          },
+          "response": [
+            {
+              "name": "200",
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"questionId\": 1,\n  \"title\": \"Two Sum\",\n  \"problemStatement\": \"...\",\n  \"examples\": [],\n  \"hints\": []\n}"
+            }
+          ]
+        },
+        {
+          "name": "POST Submission",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "disabled": false
+              }
+            ],
+            "url": "{{baseUrl}}/questions/{{questionId}}/submissions",
+            "description": "",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"language\": \"javascript\",\n  \"code\": \"...\"\n}"
+            }
+          },
+          "response": [
+            {
+              "name": "201",
+              "status": "Created",
+              "code": 201,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"id\": \"uuid\",\n  \"status\": \"accepted\"\n}"
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

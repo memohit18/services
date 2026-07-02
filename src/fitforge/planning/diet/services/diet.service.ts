@@ -9,6 +9,7 @@ import {
   RedisService,
 } from '../../../infrastructure/redis/redis.service';
 import { CreateDietDto } from '../dto/create-diet.dto';
+import { CreateDietFromAiTargetsDto } from '../dto/create-diet-from-ai-targets.dto';
 
 @Injectable()
 export class DietService {
@@ -32,13 +33,40 @@ export class DietService {
         goal: dto.goal,
         caloriesTarget: dto.caloriesTarget,
         proteinTarget: dto.proteinTarget,
-        planJson: dto.planJson,
-        aiPrompt: dto.aiPrompt,
+        carbsTarget: dto.carbsTarget,
+        fatsTarget: dto.fatsTarget,
         generatedBy: 'manual',
       },
     });
 
     return plan;
+  }
+
+  /** Persist AI-generated macro targets only — meals are built separately. */
+  async createFromAiTargets(userId: string, dto: CreateDietFromAiTargetsDto) {
+    const latest = await this.prisma.dietPlan.findFirst({
+      where: { userId },
+      orderBy: { version: 'desc' },
+    });
+    const version = (latest?.version ?? 0) + 1;
+
+    const profile = await this.prisma.userFitnessProfile.findUnique({
+      where: { userId },
+    });
+
+    return this.prisma.dietPlan.create({
+      data: {
+        userId,
+        version,
+        status: 'draft',
+        goal: dto.goal ?? profile?.fitnessGoal,
+        caloriesTarget: dto.dailyCalories,
+        proteinTarget: dto.protein,
+        carbsTarget: dto.carbs,
+        fatsTarget: dto.fats,
+        generatedBy: 'ai',
+      },
+    });
   }
 
   async getActive(userId: string) {

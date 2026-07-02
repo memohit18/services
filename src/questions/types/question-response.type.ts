@@ -41,6 +41,7 @@ export type QuestionListItemResponse = {
   expectedSpaceComplexity?: string;
   tags: string[];
   outputType?: string;
+  timeLimitMs?: number;
   followUps: string[];
   examples: QuestionExampleResponse[];
   hints: string[];

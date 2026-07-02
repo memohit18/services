@@ -4,6 +4,7 @@ import { getPagination } from '../../../../common/dto/pagination-query.dto';
 import { paginatedResponse } from '../../../../common/utils/api-response';
 import { normalizeDietType } from '../../../shared/utils/fitness-normalizers';
 import { PrismaService } from '../../../../prisma/prisma.service';
+import { CreateCustomFoodDto } from '../dto/create-custom-food.dto';
 import { CreateFoodDto } from '../dto/create-food.dto';
 import { ListFoodsQueryDto } from '../dto/list-foods-query.dto';
 import { UpdateFoodDto } from '../dto/update-food.dto';
@@ -17,6 +18,20 @@ export class FoodsService {
       data: {
         ...dto,
         dietType: dto.dietType ? normalizeDietType(dto.dietType) : undefined,
+        isCustom: false,
+        isVerified: true,
+      },
+    });
+  }
+
+  async createCustom(userId: string, dto: CreateCustomFoodDto) {
+    return this.prisma.foodMaster.create({
+      data: {
+        ...dto,
+        dietType: dto.dietType ? normalizeDietType(dto.dietType) : undefined,
+        createdByUserId: userId,
+        isCustom: true,
+        isVerified: false,
       },
     });
   }
@@ -46,9 +61,16 @@ export class FoodsService {
     return food;
   }
 
-  async search(query: ListFoodsQueryDto) {
+  async search(userId: string, query: ListFoodsQueryDto) {
     const { page, limit, skip } = getPagination(query);
-    const where: Prisma.FoodMasterWhereInput = {};
+    const filters: Prisma.FoodMasterWhereInput[] = [
+      { isVerified: true },
+      { createdByUserId: userId },
+    ];
+
+    const where: Prisma.FoodMasterWhereInput = {
+      OR: filters,
+    };
 
     if (query.category) {
       where.category = { equals: query.category, mode: 'insensitive' };
@@ -59,13 +81,18 @@ export class FoodsService {
     if (query.search) {
       where.name = { contains: query.search, mode: 'insensitive' };
     }
+    if (query.customOnly) {
+      delete where.OR;
+      where.createdByUserId = userId;
+      where.isCustom = true;
+    }
 
     const [items, total] = await Promise.all([
       this.prisma.foodMaster.findMany({
         where,
         skip,
         take: limit,
-        orderBy: { name: 'asc' },
+        orderBy: [{ isCustom: 'asc' }, { name: 'asc' }],
       }),
       this.prisma.foodMaster.count({ where }),
     ]);

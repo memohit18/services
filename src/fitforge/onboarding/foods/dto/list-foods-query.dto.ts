@@ -1,5 +1,6 @@
 import { ApiPropertyOptional } from '@nestjs/swagger';
-import { IsIn, IsOptional, IsString } from 'class-validator';
+import { Transform } from 'class-transformer';
+import { IsBoolean, IsIn, IsOptional, IsString } from 'class-validator';
 import { DIET_TYPES } from '../../../../../db-schema/postgres/constants/fitforge-values';
 import { PaginationQueryDto } from '../../../../common/dto/pagination-query.dto';
 
@@ -20,4 +21,10 @@ export class ListFoodsQueryDto extends PaginationQueryDto {
   @IsOptional()
   @IsString()
   search?: string;
+
+  @ApiPropertyOptional({ description: 'Only foods created by the current user' })
+  @IsOptional()
+  @Transform(({ value }) => value === 'true' || value === true)
+  @IsBoolean()
+  customOnly?: boolean;
 }

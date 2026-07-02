@@ -1,9 +1,11 @@
 import {
+  BadRequestException,
   ConflictException,
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
 import type { UserFitnessProfile } from '@prisma/client';
+import { ONBOARDING_STEPS } from '../../../../../db-schema/postgres/constants/fitforge-values';
 import { PrismaService } from '../../../../prisma/prisma.service';
 import {
   FitForgeCacheKeys,
@@ -17,12 +19,14 @@ import {
 } from '../../../shared/utils/fitness-normalizers';
 import { CreateFitnessProfileDto } from '../dto/create-fitness-profile.dto';
 import { UpdateFitnessProfileDto } from '../dto/update-fitness-profile.dto';
+import { UserOnboardingService } from '../../user-onboarding/services/user-onboarding.service';
 
 @Injectable()
 export class FitnessProfileService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly redis: RedisService,
+    private readonly onboardingService: UserOnboardingService,
   ) {}
 
   async create(userId: string, dto: CreateFitnessProfileDto) {
@@ -34,10 +38,16 @@ export class FitnessProfileService {
     }
 
     await this.ensurePhysiqueGoal(dto.physiqueGoalId);
+    this.validateTargetWeight(dto);
 
     const profile = await this.prisma.userFitnessProfile.create({
       data: this.toProfileData(userId, dto),
     });
+
+    await this.onboardingService.advanceToStep(
+      userId,
+      ONBOARDING_STEPS.FOOD_PREFERENCES,
+    );
 
     await this.redis.del(FitForgeCacheKeys.fitnessProfile(userId));
     return profile;
@@ -62,10 +72,15 @@ export class FitnessProfileService {
   }
 
   async update(userId: string, dto: UpdateFitnessProfileDto) {
-    await this.getByUserId(userId);
+    const existing = await this.getByUserId(userId);
     if (dto.physiqueGoalId) {
       await this.ensurePhysiqueGoal(dto.physiqueGoalId);
     }
+    this.validateTargetWeight({
+      fitnessGoal: dto.fitnessGoal ?? existing.fitnessGoal,
+      weightKg: dto.weightKg ?? existing.weightKg,
+      targetWeightKg: dto.targetWeightKg ?? existing.targetWeightKg,
+    });
 
     const profile = await this.prisma.userFitnessProfile.update({
       where: { userId },
@@ -114,6 +129,22 @@ export class FitnessProfileService {
       budgetPreference: dto.budgetPreference ?? 'moderate',
       workoutMode: dto.workoutMode,
     };
+  }
+
+  private validateTargetWeight(input: {
+    fitnessGoal: string;
+    weightKg: number;
+    targetWeightKg?: number | null;
+  }) {
+    if (
+      input.fitnessGoal === 'fat_loss' &&
+      input.targetWeightKg != null &&
+      input.targetWeightKg >= input.weightKg
+    ) {
+      throw new BadRequestException(
+        'Target weight must be lower than current weight for fat loss',
+      );
+    }
   }
 
   private async ensurePhysiqueGoal(id: string) {

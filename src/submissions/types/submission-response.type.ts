@@ -7,6 +7,7 @@ import type {
 export type SubmissionQuestionContext = {
   questionId: number;
   outputType?: string;
+  timeLimitMs: number;
   judging: QuestionJudgingResponse;
   testcaseSummary: QuestionTestcaseSummary;
 };

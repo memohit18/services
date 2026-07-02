@@ -30,11 +30,15 @@
     "start:dev": "dotenv -e .env -- nest start --watch",
     "start:debug": "dotenv -e .env -- nest start --debug --watch",
     "start:prod": "dotenv -e .env -- node dist/main",
+    "questions:set-time-limits": "dotenv -e .env -- ts-node --transpile-only scripts/set-question-time-limits.ts",
+    "questions:backfill-time-limits": "dotenv -e .env -- ts-node --transpile-only scripts/backfill-question-time-limits.ts",
+    "llm:test": "dotenv -e .env -- ts-node --transpile-only scripts/test-llm-providers.ts",
     "lint": "eslint \"src/**/*.ts\" --fix"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1073.0",
     "@aws-sdk/s3-request-presigner": "^3.1073.0",
+    "@google/genai": "^2.9.0",
     "@nestjs/common": "^11.0.1",
     "@nestjs/config": "^4.0.4",
     "@nestjs/core": "^11.0.1",
@@ -47,6 +51,7 @@
     "@prisma/client": "^7.8.0",
     "class-transformer": "^0.5.1",
     "class-validator": "^0.15.1",
+    "groq-sdk": "^1.3.0",
     "ioredis": "^5.11.1",
     "mongoose": "^9.7.0",
     "passport": "^0.7.0",

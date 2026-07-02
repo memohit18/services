@@ -16,6 +16,7 @@ import {
 import { getQuestionJudgingContext } from '../common/utils/question-judging-context.util';
 import { CreateSubmissionDto } from './dto/create-submission.dto';
 import { ListSubmissionsQueryDto } from './dto/list-submissions-query.dto';
+import { CodeJudgeService } from './judging/code-judge.service';
 import type {
   SubmissionCreateResponse,
   SubmissionListResponse,
@@ -41,6 +42,7 @@ export class SubmissionsService {
     private readonly testCaseModel: Model<TestCaseDocument>,
     private readonly activityLogsService: ActivityLogsService,
     private readonly userProgressService: UserProgressService,
+    private readonly codeJudgeService: CodeJudgeService,
   ) {}
 
   async create(
@@ -51,19 +53,22 @@ export class SubmissionsService {
   ): Promise<SubmissionCreateResponse> {
     const questionContext = await this.getQuestionContext(questionId);
 
-    const totalTestCases =
-      dto.totalTestCases ?? questionContext.testcaseSummary.total;
+    const judgeResult = await this.codeJudgeService.judgeSubmission(
+      questionId,
+      dto.language,
+      dto.code,
+    );
 
     const submission = await this.submissionModel.create({
       userId,
       questionId,
       language: dto.language,
       code: dto.code,
-      status: dto.status,
-      passedTestCases: dto.passedTestCases ?? 0,
-      totalTestCases,
-      executionTime: dto.executionTime,
-      memoryUsed: dto.memoryUsed,
+      status: judgeResult.status,
+      passedTestCases: judgeResult.passedTestCases,
+      totalTestCases: judgeResult.totalTestCases,
+      executionTime: judgeResult.executionTime,
+      memoryUsed: judgeResult.memoryUsed,
     });
 
     const formatted = this.formatSubmission(submission);
@@ -71,7 +76,7 @@ export class SubmissionsService {
     await this.userProgressService.recordSubmissionAttempt(
       userId,
       questionId,
-      dto.status,
+      judgeResult.status,
     );
 
     if (context?.userId) {
@@ -160,6 +165,7 @@ export class SubmissionsService {
       memoryUsed: submission.memoryUsed,
       codeLength,
       outputType: questionContext.outputType,
+      timeLimitMs: questionContext.timeLimitMs,
       judging: questionContext.judging,
       testcaseSummary: questionContext.testcaseSummary,
     };

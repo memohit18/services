@@ -1,5 +1,7 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { IsIn, IsOptional, IsString, MinLength } from 'class-validator';
+import { Type } from 'class-transformer';
+import { IsIn, IsInt, IsOptional, IsString, Min, MinLength } from 'class-validator';
+import { UPLOAD_CATEGORIES } from '../../../../../db-schema/postgres/constants/fitforge-values';
 
 export class PresignedUploadDto {
   @ApiProperty({ example: 'progress-front.jpg' })
@@ -11,8 +13,19 @@ export class PresignedUploadDto {
   @IsString()
   contentType: string;
 
-  @ApiPropertyOptional({ enum: ['front', 'side', 'back', 'general'] })
+  @ApiProperty({ enum: UPLOAD_CATEGORIES, example: 'progress' })
+  @IsIn(UPLOAD_CATEGORIES)
+  category: string;
+
+  @ApiPropertyOptional({ example: 245000 })
   @IsOptional()
-  @IsIn(['front', 'side', 'back', 'general'])
+  @Type(() => Number)
+  @IsInt()
+  @Min(0)
+  size?: number;
+
+  @ApiPropertyOptional({ enum: ['front', 'side', 'back'], description: 'Progress photo slot' })
+  @IsOptional()
+  @IsIn(['front', 'side', 'back'])
   photoType?: string;
 }

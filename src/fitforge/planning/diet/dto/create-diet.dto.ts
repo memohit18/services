@@ -1,6 +1,6 @@
-import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
+import { ApiProperty } from '@nestjs/swagger';
 import { Type } from 'class-transformer';
-import { IsIn, IsInt, IsOptional, IsString } from 'class-validator';
+import { IsIn, IsInt } from 'class-validator';
 import { FITNESS_GOALS } from '../../../../../db-schema/postgres/constants/fitforge-values';
 
 export class CreateDietDto {
@@ -13,17 +13,18 @@ export class CreateDietDto {
   @IsInt()
   caloriesTarget: number;
 
-  @ApiProperty({ example: 140 })
+  @ApiProperty({ example: 150 })
   @Type(() => Number)
   @IsInt()
   proteinTarget: number;
 
-  @ApiProperty({ example: '{}' })
-  @IsString()
-  planJson: string;
+  @ApiProperty({ example: 320 })
+  @Type(() => Number)
+  @IsInt()
+  carbsTarget: number;
 
-  @ApiPropertyOptional()
-  @IsOptional()
-  @IsString()
-  aiPrompt?: string;
+  @ApiProperty({ example: 80 })
+  @Type(() => Number)
+  @IsInt()
+  fatsTarget: number;
 }

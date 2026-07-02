@@ -8,6 +8,7 @@ import {
   Query,
   Req,
 } from '@nestjs/common';
+import { ApiOperation } from '@nestjs/swagger';
 import type { Request } from 'express';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
 import type { CurrentUserPayload } from '../common/decorators/current-user.decorator';
@@ -21,6 +22,9 @@ export class SubmissionsController {
   constructor(private readonly submissionsService: SubmissionsService) {}
 
   @Post()
+  @ApiOperation({
+    summary: 'Submit solution — server runs all test cases (including hidden)',
+  })
   create(
     @Param('questionId', ParseIntPipe) questionId: number,
     @CurrentUser() user: CurrentUserPayload,

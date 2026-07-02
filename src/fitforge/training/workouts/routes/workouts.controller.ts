@@ -2,24 +2,39 @@ import { Body, Controller, Get, Param, Post, Query } from '@nestjs/common';
 import {
   ApiBearerAuth,
   ApiOperation,
-  ApiResponse,
   ApiTags,
 } from '@nestjs/swagger';
 import { CurrentUser } from '../../../../common/decorators/current-user.decorator';
 import type { CurrentUserPayload } from '../../../../common/decorators/current-user.decorator';
 import { PaginationQueryDto } from '../../../../common/dto/pagination-query.dto';
 import { successResponse } from '../../../../common/utils/api-response';
+import { CreateWorkoutDayDto } from '../dto/create-workout-day.dto';
+import { CreateWorkoutExerciseDto } from '../dto/create-workout-exercise.dto';
 import { CreateWorkoutDto } from '../dto/create-workout.dto';
 import { WorkoutsService } from '../services/workouts.service';
+import { AiWorkoutPlanService } from '../../../ai/generation/ai-workout-plan.service';
 
 @ApiTags('Workouts')
 @ApiBearerAuth()
 @Controller('workouts')
 export class WorkoutsController {
-  constructor(private readonly workoutsService: WorkoutsService) {}
+  constructor(
+    private readonly workoutsService: WorkoutsService,
+    private readonly aiWorkoutPlanService: AiWorkoutPlanService,
+  ) {}
+
+  @Post('generate-ai')
+  @ApiOperation({
+    summary: 'AI generates workout plan (Gemini JSON) → WorkoutDay + WorkoutExercise',
+  })
+  generateAi(@CurrentUser() user: CurrentUserPayload) {
+    return this.aiWorkoutPlanService
+      .generate(user.userId)
+      .then((data) => successResponse(data, 'AI workout plan generated'));
+  }
 
   @Post()
-  @ApiOperation({ summary: 'Create workout plan version' })
+  @ApiOperation({ summary: 'Create workout plan with optional structured days' })
   create(
     @CurrentUser() user: CurrentUserPayload,
     @Body() dto: CreateWorkoutDto,
@@ -30,18 +45,52 @@ export class WorkoutsController {
   }
 
   @Get('active')
-  @ApiOperation({ summary: 'Get active workout plan' })
+  @ApiOperation({ summary: 'Get active workout plan with days and exercises' })
   getActive(@CurrentUser() user: CurrentUserPayload) {
     return this.workoutsService.getActive(user.userId).then((data) => successResponse(data));
   }
 
   @Get('history')
-  @ApiOperation({ summary: 'Get workout plan history' })
+  @ApiOperation({ summary: 'Get workout plan history (metadata only)' })
   getHistory(
     @CurrentUser() user: CurrentUserPayload,
     @Query() query: PaginationQueryDto,
   ) {
     return this.workoutsService.getHistory(user.userId, query);
+  }
+
+  @Get(':id')
+  @ApiOperation({ summary: 'Get workout plan with days and exercises' })
+  getById(
+    @CurrentUser() user: CurrentUserPayload,
+    @Param('id') id: string,
+  ) {
+    return this.workoutsService.getById(user.userId, id).then((data) => successResponse(data));
+  }
+
+  @Post(':id/days')
+  @ApiOperation({ summary: 'Add a workout day to a plan' })
+  addDay(
+    @CurrentUser() user: CurrentUserPayload,
+    @Param('id') id: string,
+    @Body() dto: CreateWorkoutDayDto,
+  ) {
+    return this.workoutsService
+      .addDay(user.userId, id, dto)
+      .then((data) => successResponse(data, 'Workout day added'));
+  }
+
+  @Post(':id/days/:dayId/exercises')
+  @ApiOperation({ summary: 'Add an exercise to a workout day' })
+  addExercise(
+    @CurrentUser() user: CurrentUserPayload,
+    @Param('id') id: string,
+    @Param('dayId') dayId: string,
+    @Body() dto: CreateWorkoutExerciseDto,
+  ) {
+    return this.workoutsService
+      .addExercise(user.userId, id, dayId, dto)
+      .then((data) => successResponse(data, 'Exercise added'));
   }
 
   @Post(':id/activate')

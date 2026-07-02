@@ -1,0 +1,42 @@
+---
+description: Shared LLM layer — reuse common AI utilities for FitForge, scripts, and future services
+globs: src/**/*.ts,scripts/**/*.ts
+alwaysApply: false
+---
+
+# AI / LLM conventions
+
+## Use the shared layer
+
+All LLM calls go through `src/common/ai/` — not ad-hoc `@google/genai` or raw fetch.
+
+| Context | Use |
+|---------|-----|
+| NestJS services | Inject `LlmService` (or `GeminiService` for legacy FitForge code) |
+| Scripts / CLI | `createLlmClientFromEnv()` from `src/common/ai/create-llm-client.ts` |
+| Constants | `src/common/ai/llm.constants.ts` |
+| Retry logic | `isRetryableLlmError`, `callWithRetry` from `src/common/ai/retry.util.ts` |
+
+## Provider failover
+
+`LlmClient` tries providers in `LLM_PROVIDER_ORDER` (default `gemini,grok`). Within each provider it retries with backoff, then tries fallback models, then switches to the next provider.
+
+Set at least one key: `GEMINI_API_KEY` and/or `GROK_API_KEY`.
+
+## When adding AI features
+
+1. **Check** `src/common/ai/` for `generate`, `generateJson`, retry, and config helpers.
+2. **Reuse** `LlmService` / `LlmClient` instead of new provider clients.
+3. **Keep prompts** in the feature module (e.g. `diet-targets.prompt.ts`); only infrastructure lives in `common/ai`.
+4. **Store metadata** with `buildMetadata(promptVersion)` — records actual `provider` + `model` used.
+5. **Scripts** that batch requests should use `LlmClient.generateJson<T>()` and respect `--delay-ms` between batches.
+
+## Do not
+
+- Import `@google/genai` directly outside `src/common/ai/providers/`.
+- Duplicate retry/backoff logic in scripts or services.
+- Hardcode `provider: 'gemini'` in metadata types — use `LlmProvider`.
+
+## Env vars (names only in docs)
+
+`GEMINI_API_KEY`, `XAI_API_KEY` (preferred for Grok), `GROK_API_KEY` (legacy alias — not Groq `gsk_` keys), `LLM_PROVIDER_ORDER`, `LLM_MAX_RETRIES`, `GEMINI_MODEL`, `GROK_MODEL`, plus provider-specific fallbacks. See `.env.example`.

@@ -201,6 +201,7 @@ export class ActivityLogsService {
         payload: {
           ...item.payload,
           outputType: context.outputType,
+          timeLimitMs: context.timeLimitMs,
           judging: context.judging,
           testcaseSummary: context.testcaseSummary,
         },

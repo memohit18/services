@@ -20,14 +20,47 @@ import { PaginationQueryDto } from '../../../../common/dto/pagination-query.dto'
 import { successResponse } from '../../../../common/utils/api-response';
 import { CreateMealPlanItemDto } from '../dto/create-meal-plan-item.dto';
 import { CreateMealPlanDto } from '../dto/create-meal-plan.dto';
+import { GenerateMealPlanDto } from '../dto/generate-meal-plan.dto';
 import { UpdateMealPlanItemDto } from '../dto/update-meal-plan-item.dto';
+import { AiMealPlanService } from '../../../ai/generation/ai-meal-plan.service';
+import { MealGeneratorService } from '../services/meal-generator.service';
 import { MealPlansService } from '../services/meal-plans.service';
 
 @ApiTags('Meal Plans')
 @ApiBearerAuth()
 @Controller('meal-plans')
 export class MealPlansController {
-  constructor(private readonly mealPlansService: MealPlansService) {}
+  constructor(
+    private readonly mealPlansService: MealPlansService,
+    private readonly mealGeneratorService: MealGeneratorService,
+    private readonly aiMealPlanService: AiMealPlanService,
+  ) {}
+
+  @Post('generate-ai')
+  @ApiOperation({
+    summary: 'AI suggests meal names (Gemini JSON) → mapped to FoodMaster + MealPlanItem',
+  })
+  generateAi(
+    @CurrentUser() user: CurrentUserPayload,
+    @Body() dto: GenerateMealPlanDto,
+  ) {
+    return this.aiMealPlanService
+      .generate(user.userId, dto)
+      .then((data) => successResponse(data, 'AI meal plan generated'));
+  }
+
+  @Post('generate')
+  @ApiOperation({
+    summary: 'Generate meals from targets using FoodMaster + preferences (no AI)',
+  })
+  generate(
+    @CurrentUser() user: CurrentUserPayload,
+    @Body() dto: GenerateMealPlanDto,
+  ) {
+    return this.mealGeneratorService
+      .generate(user.userId, dto)
+      .then((data) => successResponse(data, 'Meal plan generated'));
+  }
 
   @Post()
   @ApiOperation({ summary: 'Create meal plan' })

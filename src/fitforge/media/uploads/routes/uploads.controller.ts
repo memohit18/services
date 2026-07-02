@@ -1,4 +1,4 @@
-import { Body, Controller, Delete, Param, Post } from '@nestjs/common';
+import { Body, Controller, Delete, Get, Param, Post, Query } from '@nestjs/common';
 import {
   ApiBearerAuth,
   ApiOperation,
@@ -9,6 +9,7 @@ import { CurrentUser } from '../../../../common/decorators/current-user.decorato
 import type { CurrentUserPayload } from '../../../../common/decorators/current-user.decorator';
 import { successResponse } from '../../../../common/utils/api-response';
 import { ConfirmUploadDto } from '../dto/confirm-upload.dto';
+import { ListUploadsQueryDto } from '../dto/list-uploads-query.dto';
 import { PresignedUploadDto } from '../dto/presigned-upload.dto';
 import { UploadsService } from '../services/uploads.service';
 
@@ -30,7 +31,7 @@ export class UploadsController {
   }
 
   @Post('confirm')
-  @ApiOperation({ summary: 'Confirm upload and save progress photo' })
+  @ApiOperation({ summary: 'Confirm upload and persist Upload metadata' })
   confirm(
     @CurrentUser() user: CurrentUserPayload,
     @Body() dto: ConfirmUploadDto,
@@ -38,6 +39,15 @@ export class UploadsController {
     return this.uploadsService
       .confirm(user.userId, dto)
       .then((data) => successResponse(data, 'Upload confirmed'));
+  }
+
+  @Get()
+  @ApiOperation({ summary: 'List uploads for current user' })
+  list(
+    @CurrentUser() user: CurrentUserPayload,
+    @Query() query: ListUploadsQueryDto,
+  ) {
+    return this.uploadsService.list(user.userId, query);
   }
 
   @Delete(':id')
