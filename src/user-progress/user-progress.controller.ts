@@ -3,6 +3,7 @@ import {
   Body,
   Controller,
   Get,
+  Header,
   Param,
   ParseIntPipe,
   Put,
@@ -23,6 +24,7 @@ export class UserProgressController {
   constructor(private readonly userProgressService: UserProgressService) {}
 
   @Get()
+  @Header('Cache-Control', 'no-store')
   findAll(
     @CurrentUser() user: CurrentUserPayload,
     @Query() query: ListUserProgressQueryDto,
@@ -47,6 +49,7 @@ export class UserProgressController {
   }
 
   @Get(':questionId')
+  @Header('Cache-Control', 'no-store')
   findOne(
     @CurrentUser() user: CurrentUserPayload,
     @Param('questionId', ParseIntPipe) questionId: number,

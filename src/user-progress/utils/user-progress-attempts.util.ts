@@ -10,7 +10,10 @@ export function userIdMatchExpression(userId: string) {
 
 export function buildUserIdFilter(userId: string) {
   return {
-    $expr: userIdMatchExpression(userId),
+    $or: [
+      { userId },
+      { $expr: userIdMatchExpression(userId) },
+    ],
   };
 }
 

@@ -167,29 +167,70 @@ export class UserProgressService {
     userId: string,
     query: ListUserProgressQueryDto,
   ): Promise<UserProgressListResponse> {
-    const filter: Record<string, unknown> = { ...buildUserIdFilter(userId) };
-
-    if (query.status) {
-      filter.status = query.status;
-    }
-
-    const [items, total, filters] = await Promise.all([
+    const [progressDocs, submissionStats, filters] = await Promise.all([
       this.userProgressModel
-        .find(filter)
+        .find(buildUserIdFilter(userId))
         .sort({ updatedAt: -1 })
-        .select('-__v')
+        .select('questionId')
         .lean(),
-      this.userProgressModel.countDocuments(filter),
+      this.aggregateSubmissionStats(userId),
       this.getFilterSummary(userId),
     ]);
 
+    const questionIds = [
+      ...new Set([
+        ...progressDocs.map((doc) => doc.questionId),
+        ...submissionStats.map((stat) => stat.questionId),
+      ]),
+    ];
+
+    if (questionIds.length === 0) {
+      return {
+        items: [],
+        meta: {
+          total: 0,
+          appliedFilters: {
+            ...(query.status ? { status: query.status } : {}),
+          },
+        },
+        filters,
+      };
+    }
+
+    const progressByQuestionId = await this.getProgressForQuestionIds(
+      userId,
+      questionIds,
+    );
+
+    let items: UserProgressResponse[] = questionIds.map((questionId) => {
+      const progress =
+        progressByQuestionId.get(questionId) ?? defaultQuestionUserProgress();
+
+      return {
+        questionId,
+        status: progress.status,
+        attempts: progress.attempts,
+        confidence: progress.confidence,
+        lastAttemptedAt: progress.lastAttemptedAt,
+      };
+    });
+
+    items.sort((left, right) => {
+      const leftTime = left.lastAttemptedAt?.getTime() ?? 0;
+      const rightTime = right.lastAttemptedAt?.getTime() ?? 0;
+      return rightTime - leftTime;
+    });
+
+    if (query.status) {
+      items = items.filter((item) => item.status === query.status);
+    }
+
     const enrichedItems = await this.enrichWithQuestionMetadata(items);
-    const syncedItems = await this.syncAttemptsFromSubmissions(userId, enrichedItems);
 
     return {
-      items: syncedItems,
+      items: enrichedItems,
       meta: {
-        total,
+        total: enrichedItems.length,
         appliedFilters: {
           ...(query.status ? { status: query.status } : {}),
         },
@@ -258,14 +299,18 @@ export class UserProgressService {
 
     const progress = await this.userProgressModel
       .findOneAndUpdate(
-        { userId, questionId },
-        { $set: update },
+        {
+          ...buildUserIdFilter(userId),
+          questionId,
+        },
+        { $set: { ...update, userId } },
         { upsert: true, new: true, setDefaultsOnInsert: true },
       )
       .select('-__v')
       .lean();
 
     const [enriched] = await this.enrichWithQuestionMetadata([progress]);
+    const [synced] = await this.syncAttemptsFromSubmissions(userId, [enriched]);
 
     if (context?.userId) {
       await this.activityLogsService.log({
@@ -281,7 +326,7 @@ export class UserProgressService {
       });
     }
 
-    return enriched;
+    return synced;
   }
 
   async recordSubmissionAttempt(
@@ -380,26 +425,51 @@ export class UserProgressService {
   }
 
   async getFilterSummary(userId: string) {
-    const counts = await this.userProgressModel.aggregate<{
-      _id: string;
-      count: number;
-    }>([
-      { $match: buildUserIdFilter(userId) },
-      { $group: { _id: '$status', count: { $sum: 1 } } },
+    const [totalQuestions, progressDocs, submissionStats] = await Promise.all([
+      this.questionModel.countDocuments(),
+      this.userProgressModel
+        .find(buildUserIdFilter(userId))
+        .select('questionId')
+        .lean(),
+      this.aggregateSubmissionStats(userId),
     ]);
+
+    const trackedQuestionIds = [
+      ...new Set([
+        ...progressDocs.map((doc) => doc.questionId),
+        ...submissionStats.map((stat) => stat.questionId),
+      ]),
+    ];
 
     const countsByStatus: Record<string, number> = {};
     for (const status of USER_PROGRESS_STATUSES) {
       countsByStatus[status] = 0;
     }
 
-    for (const entry of counts) {
-      countsByStatus[entry._id] = entry.count;
+    if (trackedQuestionIds.length > 0) {
+      const progressByQuestionId = await this.getProgressForQuestionIds(
+        userId,
+        trackedQuestionIds,
+      );
+
+      for (const progress of progressByQuestionId.values()) {
+        if (progress.status === 'Not Started') {
+          continue;
+        }
+        countsByStatus[progress.status] =
+          (countsByStatus[progress.status] ?? 0) + 1;
+      }
     }
+
+    countsByStatus['Not Started'] = Math.max(
+      0,
+      totalQuestions - trackedQuestionIds.length,
+    );
 
     return {
       statuses: [...USER_PROGRESS_STATUSES],
       countsByStatus,
+      totalQuestions,
     };
   }
 

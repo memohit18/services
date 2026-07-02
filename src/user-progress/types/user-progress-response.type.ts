@@ -44,6 +44,7 @@ export type UserProgressListResponse = {
   filters: {
     statuses: UserProgressStatus[];
     countsByStatus: Record<string, number>;
+    totalQuestions: number;
   };
 };
 
