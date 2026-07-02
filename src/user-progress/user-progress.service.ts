@@ -26,6 +26,8 @@ import { UpdateUserProgressDto } from './dto/update-user-progress.dto';
 import type { DailyActivityResponse } from './types/daily-activity-response.type';
 import {
   defaultUserProgress,
+  defaultQuestionUserProgress,
+  type QuestionUserProgress,
   type UserProgressListResponse,
   type UserProgressResponse,
 } from './types/user-progress-response.type';
@@ -35,6 +37,11 @@ import {
   listDaysInMonth,
   parseMonthKey,
 } from './utils/month-calendar.util';
+import {
+  buildUserIdFilter,
+  resolveAttemptCount,
+  type SubmissionAttemptStats,
+} from './utils/user-progress-attempts.util';
 
 @Injectable()
 export class UserProgressService {
@@ -65,7 +72,7 @@ export class UserProgressService {
     const activeDayRows = await this.submissionModel.aggregate<{ _id: string }>([
       {
         $match: {
-          userId,
+          ...buildUserIdFilter(userId),
           createdAt: { $gte: start, $lt: end },
         },
       },
@@ -103,11 +110,64 @@ export class UserProgressService {
     };
   }
 
+  async getProgressForQuestionIds(
+    userId: string,
+    questionIds: number[],
+  ): Promise<Map<number, QuestionUserProgress>> {
+    const uniqueQuestionIds = [...new Set(questionIds)];
+    const result = new Map<number, QuestionUserProgress>();
+
+    if (uniqueQuestionIds.length === 0) {
+      return result;
+    }
+
+    const [progressDocs, submissionStats] = await Promise.all([
+      this.userProgressModel
+        .find({
+          ...buildUserIdFilter(userId),
+          questionId: { $in: uniqueQuestionIds },
+        })
+        .select('questionId status attempts confidence lastAttemptedAt')
+        .lean(),
+      this.aggregateSubmissionStats(userId, uniqueQuestionIds),
+    ]);
+
+    const progressByQuestionId = new Map(
+      progressDocs.map((doc) => [doc.questionId, doc]),
+    );
+    const submissionsByQuestionId = new Map(
+      submissionStats.map((stat) => [stat.questionId, stat]),
+    );
+
+    for (const questionId of uniqueQuestionIds) {
+      const progress = progressByQuestionId.get(questionId);
+      const submission = submissionsByQuestionId.get(questionId);
+      const attempts = resolveAttemptCount(progress?.attempts, submission?.attempts);
+
+      if (!progress && !submission) {
+        result.set(questionId, defaultQuestionUserProgress());
+        continue;
+      }
+
+      result.set(questionId, {
+        status:
+          progress?.status ??
+          (attempts > 0 ? 'Attempted' : 'Not Started'),
+        attempts,
+        confidence: progress?.confidence ?? 1,
+        lastAttemptedAt:
+          progress?.lastAttemptedAt ?? submission?.lastAttemptedAt,
+      });
+    }
+
+    return result;
+  }
+
   async findAll(
     userId: string,
     query: ListUserProgressQueryDto,
   ): Promise<UserProgressListResponse> {
-    const filter: Record<string, unknown> = { userId };
+    const filter: Record<string, unknown> = { ...buildUserIdFilter(userId) };
 
     if (query.status) {
       filter.status = query.status;
@@ -124,9 +184,10 @@ export class UserProgressService {
     ]);
 
     const enrichedItems = await this.enrichWithQuestionMetadata(items);
+    const syncedItems = await this.syncAttemptsFromSubmissions(userId, enrichedItems);
 
     return {
-      items: enrichedItems,
+      items: syncedItems,
       meta: {
         total,
         appliedFilters: {
@@ -144,16 +205,33 @@ export class UserProgressService {
     await this.ensureQuestionExists(questionId);
 
     const progress = await this.userProgressModel
-      .findOne({ userId, questionId })
+      .findOne({
+        ...buildUserIdFilter(userId),
+        questionId,
+      })
       .select('-__v')
       .lean();
 
     if (!progress) {
-      return defaultUserProgress(questionId);
+      const [submissionStats] = await this.aggregateSubmissionStats(userId, [
+        questionId,
+      ]);
+      if (!submissionStats) {
+        return defaultUserProgress(questionId);
+      }
+
+      return {
+        questionId,
+        status: 'Attempted',
+        attempts: submissionStats.attempts,
+        confidence: 1,
+        lastAttemptedAt: submissionStats.lastAttemptedAt,
+      };
     }
 
     const [enriched] = await this.enrichWithQuestionMetadata([progress]);
-    return enriched;
+    const [synced] = await this.syncAttemptsFromSubmissions(userId, [enriched]);
+    return synced;
   }
 
   async update(
@@ -212,7 +290,10 @@ export class UserProgressService {
     submissionStatus?: string,
   ) {
     const existing = await this.userProgressModel
-      .findOne({ userId, questionId })
+      .findOne({
+        ...buildUserIdFilter(userId),
+        questionId,
+      })
       .select('status')
       .lean();
 
@@ -222,9 +303,13 @@ export class UserProgressService {
     );
 
     await this.userProgressModel.findOneAndUpdate(
-      { userId, questionId },
+      {
+        ...buildUserIdFilter(userId),
+        questionId,
+      },
       {
         $set: {
+          userId,
           status,
           lastAttemptedAt: new Date(),
         },
@@ -234,12 +319,72 @@ export class UserProgressService {
     );
   }
 
+  private async aggregateSubmissionStats(
+    userId: string,
+    questionIds?: number[],
+  ): Promise<SubmissionAttemptStats[]> {
+    const match: Record<string, unknown> = {
+      ...buildUserIdFilter(userId),
+    };
+
+    if (questionIds?.length) {
+      match.questionId = { $in: questionIds };
+    }
+
+    return this.submissionModel.aggregate<SubmissionAttemptStats>([
+      { $match: match },
+      {
+        $group: {
+          _id: '$questionId',
+          attempts: { $sum: 1 },
+          lastAttemptedAt: { $max: '$createdAt' },
+        },
+      },
+      {
+        $project: {
+          _id: 0,
+          questionId: '$_id',
+          attempts: 1,
+          lastAttemptedAt: 1,
+        },
+      },
+    ]);
+  }
+
+  private async syncAttemptsFromSubmissions(
+    userId: string,
+    items: UserProgressResponse[],
+  ): Promise<UserProgressResponse[]> {
+    if (items.length === 0) {
+      return items;
+    }
+
+    const submissionStats = await this.aggregateSubmissionStats(
+      userId,
+      items.map((item) => item.questionId),
+    );
+    const submissionsByQuestionId = new Map(
+      submissionStats.map((stat) => [stat.questionId, stat]),
+    );
+
+    return items.map((item) => {
+      const submission = submissionsByQuestionId.get(item.questionId);
+      const attempts = resolveAttemptCount(item.attempts, submission?.attempts);
+
+      return {
+        ...item,
+        attempts,
+        lastAttemptedAt: item.lastAttemptedAt ?? submission?.lastAttemptedAt,
+      };
+    });
+  }
+
   async getFilterSummary(userId: string) {
     const counts = await this.userProgressModel.aggregate<{
       _id: string;
       count: number;
     }>([
-      { $match: { userId } },
+      { $match: buildUserIdFilter(userId) },
       { $group: { _id: '$status', count: { $sum: 1 } } },
     ]);
 

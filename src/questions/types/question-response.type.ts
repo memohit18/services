@@ -1,3 +1,5 @@
+import type { QuestionUserProgress } from '../../user-progress/types/user-progress-response.type';
+
 export type QuestionExampleResponse = {
   input: Record<string, unknown>;
   output: unknown;
@@ -47,6 +49,7 @@ export type QuestionListItemResponse = {
   hints: string[];
   testcaseCount: number;
   sampleTestcaseCount: number;
+  userProgress?: QuestionUserProgress;
   createdAt?: Date;
   updatedAt?: Date;
 };

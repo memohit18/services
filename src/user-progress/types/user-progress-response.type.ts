@@ -2,6 +2,21 @@ import { USER_PROGRESS_STATUSES } from '../../../db-schema/mongodb/schemas/user-
 
 export type UserProgressStatus = (typeof USER_PROGRESS_STATUSES)[number];
 
+export type QuestionUserProgress = {
+  status: UserProgressStatus;
+  attempts: number;
+  confidence: number;
+  lastAttemptedAt?: Date;
+};
+
+export function defaultQuestionUserProgress(): QuestionUserProgress {
+  return {
+    status: 'Not Started',
+    attempts: 0,
+    confidence: 1,
+  };
+}
+
 export type UserProgressResponse = {
   questionId: number;
   status: UserProgressStatus;

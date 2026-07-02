@@ -54,6 +54,7 @@ import {
   type ActivityLogContext,
 } from '../activity-logs/types/activity-log.types';
 import { RoadmapsService } from '../roadmaps/roadmaps.service';
+import { UserProgressService } from '../user-progress/user-progress.service';
 import type { QuestionListItemWithRoadmap } from './types/question-filters-response.type';
 
 @Injectable()
@@ -71,6 +72,7 @@ export class QuestionsService {
     private readonly testCaseModel: Model<TestCaseDocument>,
     private readonly activityLogsService: ActivityLogsService,
     private readonly roadmapsService: RoadmapsService,
+    private readonly userProgressService: UserProgressService,
   ) {}
 
   async findAll(
@@ -106,7 +108,7 @@ export class QuestionsService {
       this.getFilters(),
     ]);
 
-    const enrichedItems = await this.buildQuestionListResponse(items);
+    const enrichedItems = await this.buildQuestionListResponse(items, userId);
 
     return {
       items: enrichedItems,
@@ -178,7 +180,7 @@ export class QuestionsService {
 
     const total = allMatching.length;
     const pagedItems = allMatching.slice((page - 1) * limit, page * limit);
-    const enrichedItems = await this.buildQuestionListResponse(pagedItems);
+    const enrichedItems = await this.buildQuestionListResponse(pagedItems, userId);
 
     const itemsWithRoadmap: QuestionListItemWithRoadmap[] =
       enrichedItems.map((item) => ({
@@ -533,6 +535,7 @@ export class QuestionsService {
 
   private async buildQuestionListResponse(
     questions: QuestionSourceDocument[],
+    userId: string,
   ): Promise<QuestionListItemResponse[]> {
     if (questions.length === 0) {
       return [];
@@ -545,11 +548,13 @@ export class QuestionsService {
       hintsByQuestionId,
       followUpsByQuestionId,
       testcaseCountsByQuestionId,
+      progressByQuestionId,
     ] = await Promise.all([
       this.getExamplesByQuestionId(questionIds),
       this.getHintsByQuestionId(questionIds),
       this.getFollowUpsByQuestionId(questionIds),
       this.getTestcaseCounts(questionIds),
+      this.userProgressService.getProgressForQuestionIds(userId, questionIds),
     ]);
 
     return questions.map((question) =>
@@ -560,6 +565,7 @@ export class QuestionsService {
         counts:
           testcaseCountsByQuestionId.get(question.questionId) ??
           emptyTestcaseCounts(),
+        userProgress: progressByQuestionId.get(question.questionId),
       }),
     );
   }
@@ -571,6 +577,7 @@ export class QuestionsService {
       hints: string[];
       followUps: string[];
       counts: TestcaseCounts;
+      userProgress?: QuestionListItemResponse['userProgress'];
     },
   ): QuestionListItemResponse {
     return {
@@ -591,6 +598,7 @@ export class QuestionsService {
       hints: this.resolveHints(related.hints, question),
       testcaseCount: related.counts.testcaseCount,
       sampleTestcaseCount: related.counts.sampleTestcaseCount,
+      userProgress: related.userProgress,
       createdAt: question.createdAt,
       updatedAt: question.updatedAt,
     };
