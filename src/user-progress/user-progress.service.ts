@@ -39,6 +39,7 @@ import {
 } from './utils/month-calendar.util';
 import {
   buildUserIdFilter,
+  buildUserProgressWriteFilter,
   resolveAttemptCount,
   type SubmissionAttemptStats,
 } from './utils/user-progress-attempts.util';
@@ -299,10 +300,7 @@ export class UserProgressService {
 
     const progress = await this.userProgressModel
       .findOneAndUpdate(
-        {
-          ...buildUserIdFilter(userId),
-          questionId,
-        },
+        buildUserProgressWriteFilter(userId, questionId),
         { $set: { ...update, userId } },
         { upsert: true, new: true, setDefaultsOnInsert: true },
       )
@@ -339,7 +337,7 @@ export class UserProgressService {
         ...buildUserIdFilter(userId),
         questionId,
       })
-      .select('status')
+      .select('_id status')
       .lean();
 
     const status = this.resolveStatusAfterSubmission(
@@ -347,14 +345,16 @@ export class UserProgressService {
       submissionStatus,
     );
 
+    const writeFilter = existing?._id
+      ? { _id: existing._id }
+      : buildUserProgressWriteFilter(userId, questionId);
+
     await this.userProgressModel.findOneAndUpdate(
-      {
-        ...buildUserIdFilter(userId),
-        questionId,
-      },
+      writeFilter,
       {
         $set: {
           userId,
+          questionId,
           status,
           lastAttemptedAt: new Date(),
         },

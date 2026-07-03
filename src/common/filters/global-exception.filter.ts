@@ -108,9 +108,14 @@ export class GlobalExceptionFilter implements ExceptionFilter {
   private getMongoErrorMessage(exception: {
     name: string;
     message: string;
+    code?: number;
   }): string {
     if (exception.message.includes('requires authentication')) {
       return 'MongoDB authentication failed. Check MONGODB_URL credentials in .env';
+    }
+
+    if (exception.code === 224) {
+      return 'MongoDB upsert query is invalid. Deploy the latest services build.';
     }
 
     return 'MongoDB operation failed';

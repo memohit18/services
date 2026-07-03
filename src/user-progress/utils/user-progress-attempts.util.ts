@@ -17,6 +17,14 @@ export function buildUserIdFilter(userId: string) {
   };
 }
 
+/** Use for upserts — MongoDB rejects $expr / $or in upsert predicates (error 224). */
+export function buildUserProgressWriteFilter(
+  userId: string,
+  questionId: number,
+) {
+  return { userId, questionId };
+}
+
 export function resolveAttemptCount(
   storedAttempts: number | undefined,
   submissionAttempts: number | undefined,
