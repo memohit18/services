@@ -33,16 +33,21 @@ export class FoodsRepository {
     return { items, total };
   }
 
-  async categories(): Promise<string[]> {
-    const rows = await this.prisma.foodMaster.findMany({
+  async categories(): Promise<Array<{ id: string; label: string; count: number }>> {
+    const rows = await this.prisma.foodMaster.groupBy({
+      by: ['category'],
       where: { isVerified: true, category: { not: null } },
-      select: { category: true },
-      distinct: ['category'],
+      _count: { category: true },
       orderBy: { category: 'asc' },
     });
+
     return rows
-      .map((row) => row.category)
-      .filter((category): category is string => category !== null);
+      .filter((row): row is typeof row & { category: string } => row.category !== null)
+      .map((row) => ({
+        id: row.category,
+        label: row.category,
+        count: row._count.category,
+      }));
   }
 
   async findById(id: string): Promise<FoodMaster | null> {
