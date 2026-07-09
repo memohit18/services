@@ -1,0 +1,191 @@
+{
+  "info": {
+    "name": "FitForge API",
+    "description": "# Setup\n1. Set `baseUrl` (default http://localhost:3303)\n2. Set `accessToken` from auth-service\n\nAll routes use Bearer auth unless noted.\n\n# Response envelope\n```json\n{ \"success\": true, \"message\": \"...\", \"data\": {} }\n```\n\n# Phases\n- **01** Fitness Profile (Phase 1)\n- **02** Transformation (Phase 2)\n- **03** Foods & Food Preferences (Phase 3)",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    { "key": "baseUrl", "value": "http://localhost:3303" },
+    { "key": "accessToken", "value": "" },
+    { "key": "transformationId", "value": "" },
+    { "key": "foodId", "value": "" }
+  ],
+  "auth": {
+    "type": "bearer",
+    "bearer": [{ "key": "token", "value": "{{accessToken}}", "type": "string" }]
+  },
+  "item": [
+    {
+      "name": "01 — Fitness Profile (Phase 1)",
+      "description": "Onboarding fitness profile at /fitness/*",
+      "item": [
+        {
+          "name": "GET Physique Goals",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Accept", "value": "application/json" }],
+            "url": "{{baseUrl}}/fitness/goals",
+            "description": "Returns goals with slug ids (lean, athletic, etc.)"
+          }
+        },
+        {
+          "name": "GET Profile",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Accept", "value": "application/json" }],
+            "url": "{{baseUrl}}/fitness/profile",
+            "description": "App load — 404 = new user"
+          }
+        },
+        {
+          "name": "POST Create Profile",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": "{{baseUrl}}/fitness/profile",
+            "description": "onboardingCompleted:true auto-generates transformation.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"age\": 28,\n  \"gender\": \"male\",\n  \"heightCm\": 180,\n  \"weightKg\": 85,\n  \"activityLevel\": \"moderate\",\n  \"fitnessGoal\": \"fat_loss\",\n  \"physiqueGoalId\": \"lean\",\n  \"dietType\": \"high_protein\",\n  \"workoutExperience\": \"intermediate\",\n  \"workoutDaysPerWeek\": 4,\n  \"targetWeightKg\": 75,\n  \"targetBodyFatPercent\": 12,\n  \"allergies\": \"None\",\n  \"onboardingCompleted\": true\n}"
+            }
+          }
+        },
+        {
+          "name": "PATCH Update Profile",
+          "request": {
+            "method": "PATCH",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": "{{baseUrl}}/fitness/profile",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"weightKg\": 73,\n  \"fitnessGoal\": \"fat_loss\",\n  \"onboardingCompleted\": true\n}"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "02 — Transformation (Phase 2)",
+      "description": "Deterministic engine — requires fitness profile.",
+      "item": [
+        {
+          "name": "POST Generate",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Accept", "value": "application/json" }],
+            "url": "{{baseUrl}}/transformation/generate"
+          }
+        },
+        {
+          "name": "GET Active",
+          "request": { "method": "GET", "url": "{{baseUrl}}/transformation/active" }
+        },
+        {
+          "name": "GET History",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/transformation/history?page=1&limit=20",
+              "host": ["{{baseUrl}}"],
+              "path": ["transformation", "history"],
+              "query": [
+                { "key": "page", "value": "1" },
+                { "key": "limit", "value": "20" }
+              ]
+            }
+          }
+        },
+        {
+          "name": "GET Milestones",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/transformation/{{transformationId}}/milestones"
+          }
+        }
+      ]
+    },
+    {
+      "name": "03 — Foods (Phase 3)",
+      "description": "Food catalog search and categories",
+      "item": [
+        {
+          "name": "GET Search Foods",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/foods?page=1&limit=20&search=paneer&category=protein",
+              "host": ["{{baseUrl}}"],
+              "path": ["foods"],
+              "query": [
+                { "key": "page", "value": "1" },
+                { "key": "limit", "value": "20" },
+                { "key": "search", "value": "paneer" },
+                { "key": "category", "value": "protein" },
+                { "key": "dietType", "value": "vegetarian", "disabled": true }
+              ]
+            }
+          }
+        },
+        {
+          "name": "GET Food Categories",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/foods/categories"
+          }
+        },
+        {
+          "name": "GET Food By ID",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/foods/{{foodId}}"
+          }
+        }
+      ]
+    },
+    {
+      "name": "03 — Food Preferences (Phase 3)",
+      "description": "User food and nutrition preferences",
+      "item": [
+        {
+          "name": "GET Food Preferences",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/food-preferences"
+          }
+        },
+        {
+          "name": "POST Add Preference",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": "{{baseUrl}}/food-preferences",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"foodId\": \"{{foodId}}\",\n  \"preferenceType\": \"favorite\"\n}"
+            }
+          }
+        },
+        {
+          "name": "PATCH Replace Preferences",
+          "request": {
+            "method": "PATCH",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": "{{baseUrl}}/food-preferences",
+            "description": "Transactional replace — food cannot appear in multiple groups.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"favorites\": [\"{{foodId}}\"],\n  \"available\": [],\n  \"restricted\": [],\n  \"allergies\": [],\n  \"nutrition\": {\n    \"budgetCategory\": \"moderate\",\n    \"preferredCuisine\": \"indian\",\n    \"mealCount\": 4,\n    \"cookingTime\": \"moderate\"\n  }\n}"
+            }
+          }
+        },
+        {
+          "name": "DELETE Preference By Food ID",
+          "request": {
+            "method": "DELETE",
+            "url": "{{baseUrl}}/food-preferences/{{foodId}}"
+          }
+        }
+      ]
+    }
+  ]
+}

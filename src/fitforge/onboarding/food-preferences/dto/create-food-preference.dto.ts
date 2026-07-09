@@ -1,13 +1,13 @@
 import { ApiProperty } from '@nestjs/swagger';
-import { IsIn, IsUUID } from 'class-validator';
-import { FOOD_PREFERENCE_TYPES } from '../../../../../db-schema/postgres/constants/fitforge-values';
+import { IsEnum, IsUUID } from 'class-validator';
+import { FoodPreferenceTypeEnum } from '../constants/food-preferences.enums';
 
 export class CreateFoodPreferenceDto {
   @ApiProperty({ format: 'uuid' })
-  @IsUUID()
+  @IsUUID('4')
   foodId: string;
 
-  @ApiProperty({ enum: FOOD_PREFERENCE_TYPES, example: 'favorite' })
-  @IsIn(FOOD_PREFERENCE_TYPES)
-  preferenceType: string;
+  @ApiProperty({ enum: FoodPreferenceTypeEnum, example: FoodPreferenceTypeEnum.FAVORITE })
+  @IsEnum(FoodPreferenceTypeEnum)
+  preferenceType: FoodPreferenceTypeEnum;
 }

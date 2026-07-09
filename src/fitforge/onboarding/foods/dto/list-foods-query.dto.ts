@@ -1,30 +1,24 @@
 import { ApiPropertyOptional } from '@nestjs/swagger';
-import { Transform } from 'class-transformer';
-import { IsBoolean, IsIn, IsOptional, IsString } from 'class-validator';
+import { IsIn, IsOptional, IsString } from 'class-validator';
 import { DIET_TYPES } from '../../../../../db-schema/postgres/constants/fitforge-values';
 import { PaginationQueryDto } from '../../../../common/dto/pagination-query.dto';
+import { FOOD_CATEGORY_VALUES } from '../../food-preferences/constants/food-preferences.enums';
 
 const DIET_TYPE_INPUT = [...DIET_TYPES, 'veg', 'non_veg'] as const;
 
 export class ListFoodsQueryDto extends PaginationQueryDto {
-  @ApiPropertyOptional({ example: 'protein' })
+  @ApiPropertyOptional({ enum: FOOD_CATEGORY_VALUES, example: 'protein' })
   @IsOptional()
-  @IsString()
+  @IsIn(FOOD_CATEGORY_VALUES)
   category?: string;
 
-  @ApiPropertyOptional({ example: 'veg' })
+  @ApiPropertyOptional({ example: 'vegetarian' })
   @IsOptional()
   @IsIn(DIET_TYPE_INPUT)
   dietType?: string;
 
-  @ApiPropertyOptional({ example: 'egg' })
+  @ApiPropertyOptional({ example: 'paneer' })
   @IsOptional()
   @IsString()
   search?: string;
-
-  @ApiPropertyOptional({ description: 'Only foods created by the current user' })
-  @IsOptional()
-  @Transform(({ value }) => value === 'true' || value === true)
-  @IsBoolean()
-  customOnly?: boolean;
 }

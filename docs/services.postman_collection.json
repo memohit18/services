@@ -239,6 +239,57 @@
       ]
     },
     {
+      "name": "01a — Fitness API (Frontend)",
+      "description": "Phase 1 — /fitness/* routes for onboarding UI. All require JWT.",
+      "item": [
+        {
+          "name": "GET /fitness/goals",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/fitness/goals",
+            "description": "Step 5 — physique goals with slug ids (lean, athletic)"
+          },
+          "response": []
+        },
+        {
+          "name": "GET /fitness/profile",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/fitness/profile",
+            "description": "404 = new user"
+          },
+          "response": []
+        },
+        {
+          "name": "POST /fitness/profile",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": "{{baseUrl}}/fitness/profile",
+            "description": "onboardingCompleted:true auto-generates transformation",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"age\": 28,\n  \"gender\": \"male\",\n  \"heightCm\": 180,\n  \"weightKg\": 85,\n  \"activityLevel\": \"moderate\",\n  \"fitnessGoal\": \"fat_loss\",\n  \"physiqueGoalId\": \"lean\",\n  \"dietType\": \"high_protein\",\n  \"workoutExperience\": \"intermediate\",\n  \"workoutDaysPerWeek\": 4,\n  \"targetWeightKg\": 75,\n  \"targetBodyFatPercent\": 12,\n  \"allergies\": \"None\",\n  \"onboardingCompleted\": true\n}"
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "PATCH /fitness/profile",
+          "request": {
+            "method": "PATCH",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": "{{baseUrl}}/fitness/profile",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"weightKg\": 73,\n  \"onboardingCompleted\": true\n}"
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
       "name": "02 — Fitness Profile",
       "description": "Onboarding — one profile per user. Create before GET.",
       "item": [
@@ -764,7 +815,7 @@
                   "value": "application/json"
                 }
               ],
-              "body": "{\n  \"success\": true,\n  \"message\": \"Transformation plan generated\",\n  \"data\": {\n    \"id\": \"uuid\",\n    \"userId\": \"...\",\n    \"currentWeightKg\": 78,\n    \"targetWeightKg\": 85,\n    \"estimatedWeeks\": 14,\n    \"status\": \"active\",\n    \"bmi\": 25.5,\n    \"bmr\": 1780,\n    \"tdee\": 2600,\n    \"dailyCalorieTarget\": 2900,\n    \"proteinTarget\": 156,\n    \"milestones\": [\n      {\n        \"weekNumber\": 4,\n        \"status\": \"pending\"\n      }\n    ]\n  }\n}"
+              "body": "{\n  \"success\": true,\n  \"message\": \"Transformation generated successfully\",\n  \"data\": {\n    \"id\": \"uuid\",\n    \"bmi\": 26.2,\n    \"bmr\": 1815,\n    \"tdee\": 2813,\n    \"calories\": 2313,\n    \"protein\": 165,\n    \"estimatedWeeks\": 20,\n    \"currentWeightKg\": 85,\n    \"targetWeightKg\": 75,\n    \"status\": \"ACTIVE\",\n    \"milestones\": []\n  }\n}"
             }
           ]
         },
@@ -861,110 +912,85 @@
       ]
     },
     {
-      "name": "07 — Diet",
+      "name": "07 — Diet & Planner",
       "item": [
+        {
+          "name": "GET Diet Planner Dashboard",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/diet/planner?date=2026-07-09",
+            "description": "Today's meals, macros, hydration, coach insight"
+          },
+          "response": []
+        },
+        {
+          "name": "PATCH Add Hydration",
+          "request": {
+            "method": "PATCH",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": "{{baseUrl}}/diet/planner/hydration",
+            "body": { "mode": "raw", "raw": "{\n  \"amountMl\": 250\n}" }
+          },
+          "response": []
+        },
         {
           "name": "POST Generate targets (Gemini)",
           "request": {
             "method": "POST",
             "url": "{{baseUrl}}/diet/generate-targets",
-            "description": "AI reads profile → returns macro targets only"
+            "description": "AI reads profile → returns macro targets"
           },
           "response": []
         },
         {
-          "name": "POST From targets (manual)",
+          "name": "POST From targets",
           "request": {
             "method": "POST",
-            "header": [
-              {
-                "key": "Content-Type",
-                "value": "application/json",
-                "disabled": false
-              }
-            ],
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": "{{baseUrl}}/diet/from-targets",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"goal\": \"muscle_gain\",\n  \"dailyCalories\": 2800,\n  \"protein\": 150,\n  \"carbs\": 320,\n  \"fats\": 80\n}"
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "POST Create diet plan",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
             "url": "{{baseUrl}}/diet",
-            "description": "Nutrition targets only — meals live in MealPlan",
             "body": {
               "mode": "raw",
               "raw": "{\n  \"goal\": \"muscle_gain\",\n  \"caloriesTarget\": 2800,\n  \"proteinTarget\": 150,\n  \"carbsTarget\": 320,\n  \"fatsTarget\": 80\n}"
             }
           },
-          "response": [
-            {
-              "name": "201",
-              "status": "Created",
-              "code": 201,
-              "_postman_previewlanguage": "json",
-              "header": [
-                {
-                  "key": "Content-Type",
-                  "value": "application/json"
-                }
-              ],
-              "body": "{\n  \"success\": true,\n  \"message\": \"Diet plan created\",\n  \"data\": {\n    \"id\": \"uuid\",\n    \"version\": 1,\n    \"status\": \"draft\",\n    \"goal\": \"muscle_gain\",\n    \"caloriesTarget\": 2800,\n    \"proteinTarget\": 150,\n    \"carbsTarget\": 320,\n    \"fatsTarget\": 80\n  }\n}"
-            }
-          ]
+          "response": []
         },
         {
           "name": "GET Active",
           "request": {
             "method": "GET",
-            "header": [
-              {
-                "key": "Content-Type",
-                "value": "application/json",
-                "disabled": true
-              }
-            ],
-            "url": "{{baseUrl}}/diet/active",
-            "description": ""
+            "url": "{{baseUrl}}/diet/active"
           },
-          "response": [
-            {
-              "name": "200",
-              "status": "OK",
-              "code": 200,
-              "_postman_previewlanguage": "json",
-              "header": [
-                {
-                  "key": "Content-Type",
-                  "value": "application/json"
-                }
-              ],
-              "body": "{\n  \"success\": true,\n  \"message\": \"Success\",\n  \"data\": {\n    \"id\": \"uuid\",\n    \"status\": \"active\",\n    \"version\": 1\n  }\n}"
-            }
-          ]
+          "response": []
+        },
+        {
+          "name": "GET History",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/diet/history?page=1&limit=20"
+          },
+          "response": []
         },
         {
           "name": "POST Activate",
           "request": {
             "method": "POST",
-            "header": [
-              {
-                "key": "Content-Type",
-                "value": "application/json",
-                "disabled": false
-              }
-            ],
-            "url": "{{baseUrl}}/diet/{{dietPlanId}}/activate",
-            "description": "Archives current active, sets this active"
+            "url": "{{baseUrl}}/diet/{{dietPlanId}}/activate"
           },
-          "response": [
-            {
-              "name": "200",
-              "status": "OK",
-              "code": 200,
-              "_postman_previewlanguage": "json",
-              "header": [
-                {
-                  "key": "Content-Type",
-                  "value": "application/json"
-                }
-              ],
-              "body": "{\n  \"success\": true,\n  \"message\": \"Diet plan activated\",\n  \"data\": {\n    \"id\": \"uuid\",\n    \"status\": \"active\"\n  }\n}"
-            }
-          ]
+          "response": []
         }
       ]
     },
@@ -972,106 +998,129 @@
       "name": "08 — Meal Plans & Logs",
       "item": [
         {
+          "name": "POST Generate Meals (AI)",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": "{{baseUrl}}/meal-plans/generate-ai",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"dietPlanId\": \"{{dietPlanId}}\",\n  \"planType\": \"weekly\",\n  \"days\": 7\n}"
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "POST Generate Meals (Rule-based)",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": "{{baseUrl}}/meal-plans/generate",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"dietPlanId\": \"{{dietPlanId}}\",\n  \"planType\": \"weekly\",\n  \"days\": 7\n}"
+            }
+          },
+          "response": []
+        },
+        {
           "name": "POST Meal plan",
           "request": {
             "method": "POST",
-            "header": [
-              {
-                "key": "Content-Type",
-                "value": "application/json",
-                "disabled": false
-              }
-            ],
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
             "url": "{{baseUrl}}/meal-plans",
-            "description": "planType: weekly | monthly",
             "body": {
               "mode": "raw",
               "raw": "{\n  \"dietPlanId\": \"{{dietPlanId}}\",\n  \"planType\": \"weekly\"\n}"
             }
           },
-          "response": [
-            {
-              "name": "201",
-              "status": "Created",
-              "code": 201,
-              "_postman_previewlanguage": "json",
-              "header": [
-                {
-                  "key": "Content-Type",
-                  "value": "application/json"
-                }
-              ],
-              "body": "{\n  \"success\": true,\n  \"message\": \"Meal plan created\",\n  \"data\": {\n    \"id\": \"uuid\",\n    \"version\": 1,\n    \"planType\": \"weekly\",\n    \"status\": \"draft\"\n  }\n}"
-            }
-          ]
+          "response": []
+        },
+        {
+          "name": "GET Active Meal Plan",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/meal-plans/active",
+            "description": "All meals with food details"
+          },
+          "response": []
+        },
+        {
+          "name": "GET Meal Plan History",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/meal-plans/history?page=1&limit=20"
+          },
+          "response": []
+        },
+        {
+          "name": "GET Meal Schedule",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/meal-plans/{{mealPlanId}}/schedule",
+            "description": "Meals grouped by dayNumber"
+          },
+          "response": []
+        },
+        {
+          "name": "POST Activate Meal Plan",
+          "request": {
+            "method": "POST",
+            "url": "{{baseUrl}}/meal-plans/{{mealPlanId}}/activate"
+          },
+          "response": []
         },
         {
           "name": "POST Meal item",
           "request": {
             "method": "POST",
-            "header": [
-              {
-                "key": "Content-Type",
-                "value": "application/json",
-                "disabled": false
-              }
-            ],
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
             "url": "{{baseUrl}}/meal-plans/{{mealPlanId}}/items",
-            "description": "mealType: breakfast|lunch|snack|dinner",
             "body": {
               "mode": "raw",
               "raw": "{\n  \"dayNumber\": 1,\n  \"mealType\": \"breakfast\",\n  \"foodId\": \"{{foodId}}\",\n  \"quantity\": 2,\n  \"calories\": 156,\n  \"protein\": 12,\n  \"carbs\": 1.2,\n  \"fats\": 10\n}"
             }
           },
-          "response": [
-            {
-              "name": "201",
-              "status": "Created",
-              "code": 201,
-              "_postman_previewlanguage": "json",
-              "header": [
-                {
-                  "key": "Content-Type",
-                  "value": "application/json"
-                }
-              ],
-              "body": "{\n  \"success\": true,\n  \"message\": \"Meal item added\",\n  \"data\": {\n    \"id\": \"uuid\",\n    \"dayNumber\": 1,\n    \"mealType\": \"breakfast\"\n  }\n}"
-            }
-          ]
+          "response": []
         },
         {
-          "name": "POST Meal log",
+          "name": "POST Meal log — completed",
           "request": {
             "method": "POST",
-            "header": [
-              {
-                "key": "Content-Type",
-                "value": "application/json",
-                "disabled": false
-              }
-            ],
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
             "url": "{{baseUrl}}/meal-logs",
-            "description": "status: completed | skipped | replaced (+ replacementFoodId)",
             "body": {
               "mode": "raw",
               "raw": "{\n  \"mealPlanItemId\": \"{{mealPlanItemId}}\",\n  \"status\": \"completed\"\n}"
             }
           },
-          "response": [
-            {
-              "name": "201",
-              "status": "Created",
-              "code": 201,
-              "_postman_previewlanguage": "json",
-              "header": [
-                {
-                  "key": "Content-Type",
-                  "value": "application/json"
-                }
-              ],
-              "body": "{\n  \"success\": true,\n  \"message\": \"Meal logged\",\n  \"data\": {\n    \"id\": \"uuid\",\n    \"status\": \"completed\"\n  }\n}"
+          "response": []
+        },
+        {
+          "name": "POST Meal log — skipped",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": "{{baseUrl}}/meal-logs",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"mealPlanItemId\": \"{{mealPlanItemId}}\",\n  \"status\": \"skipped\"\n}"
             }
-          ]
+          },
+          "response": []
+        },
+        {
+          "name": "POST Meal log — replaced",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": "{{baseUrl}}/meal-logs",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"mealPlanItemId\": \"{{mealPlanItemId}}\",\n  \"status\": \"replaced\",\n  \"replacementFoodId\": \"{{foodId}}\"\n}"
+            }
+          },
+          "response": []
         }
       ]
     },
@@ -1082,31 +1131,26 @@
           "name": "POST Grocery generate",
           "request": {
             "method": "POST",
-            "header": [
-              {
-                "key": "Content-Type",
-                "value": "application/json",
-                "disabled": false
-              }
-            ],
             "url": "{{baseUrl}}/grocery/generate",
             "description": "From active meal plan"
           },
-          "response": [
-            {
-              "name": "201",
-              "status": "Created",
-              "code": 201,
-              "_postman_previewlanguage": "json",
-              "header": [
-                {
-                  "key": "Content-Type",
-                  "value": "application/json"
-                }
-              ],
-              "body": "{\n  \"success\": true,\n  \"message\": \"Grocery list generated\",\n  \"data\": {\n    \"id\": \"uuid\",\n    \"items\": [\n      {\n        \"foodId\": \"uuid\",\n        \"name\": \"Egg\",\n        \"quantity\": 14,\n        \"unit\": \"1 large\"\n      }\n    ]\n  }\n}"
-            }
-          ]
+          "response": []
+        },
+        {
+          "name": "GET Grocery current",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/grocery/current"
+          },
+          "response": []
+        },
+        {
+          "name": "GET Grocery history",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/grocery/history?page=1&limit=10"
+          },
+          "response": []
         },
         {
           "name": "POST Workout",

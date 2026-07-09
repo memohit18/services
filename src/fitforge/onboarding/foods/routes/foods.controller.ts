@@ -1,14 +1,4 @@
-import {
-  Body,
-  Controller,
-  Delete,
-  Get,
-  Param,
-  Post,
-  Put,
-  Query,
-  UseGuards,
-} from '@nestjs/common';
+import { Controller, Get, Param, Query } from '@nestjs/common';
 import {
   ApiBearerAuth,
   ApiOperation,
@@ -17,65 +7,40 @@ import {
 } from '@nestjs/swagger';
 import { CurrentUser } from '../../../../common/decorators/current-user.decorator';
 import type { CurrentUserPayload } from '../../../../common/decorators/current-user.decorator';
-import { Roles } from '../../../../common/decorators/roles.decorator';
-import { RolesGuard } from '../../../../common/guards/roles.guard';
 import { successResponse } from '../../../../common/utils/api-response';
-import { CreateCustomFoodDto } from '../dto/create-custom-food.dto';
-import { CreateFoodDto } from '../dto/create-food.dto';
 import { FoodResponseDto } from '../dto/food-response.dto';
 import { ListFoodsQueryDto } from '../dto/list-foods-query.dto';
-import { UpdateFoodDto } from '../dto/update-food.dto';
 import { FoodsService } from '../services/foods.service';
 
-@ApiTags('Food Catalog')
+@ApiTags('Foods')
 @ApiBearerAuth()
 @Controller('foods')
 export class FoodsController {
   constructor(private readonly foodsService: FoodsService) {}
 
-  @Post('custom')
-  @ApiOperation({ summary: 'Create custom food (user-owned, unverified)' })
-  @ApiResponse({ status: 201, type: FoodResponseDto })
-  createCustom(
-    @CurrentUser() user: CurrentUserPayload,
-    @Body() dto: CreateCustomFoodDto,
-  ) {
+  @Get('categories')
+  @ApiOperation({ summary: 'List food categories' })
+  categories() {
     return this.foodsService
-      .createCustom(user.userId, dto)
-      .then((data) => successResponse(data, 'Custom food created'));
+      .getCategories()
+      .then((data) => successResponse(data, 'Food categories retrieved'));
   }
 
-  @Post()
-  @Roles('admin')
-  @UseGuards(RolesGuard)
-  @ApiOperation({ summary: 'Create verified food (admin)' })
-  @ApiResponse({ status: 201, type: FoodResponseDto })
-  create(@Body() dto: CreateFoodDto) {
-    return this.foodsService.create(dto).then((data) => successResponse(data, 'Food created'));
-  }
-
-  @Put(':id')
-  @Roles('admin')
-  @UseGuards(RolesGuard)
-  @ApiOperation({ summary: 'Update food (admin)' })
-  update(@Param('id') id: string, @Body() dto: UpdateFoodDto) {
-    return this.foodsService.update(id, dto).then((data) => successResponse(data, 'Food updated'));
-  }
-
-  @Delete(':id')
-  @Roles('admin')
-  @UseGuards(RolesGuard)
-  @ApiOperation({ summary: 'Delete food (admin)' })
-  remove(@Param('id') id: string) {
-    return this.foodsService.remove(id).then((data) => successResponse(data, 'Food deleted'));
+  @Get(':id')
+  @ApiOperation({ summary: 'Get food by ID' })
+  @ApiResponse({ status: 200, type: FoodResponseDto })
+  findOne(@Param('id') id: string) {
+    return this.foodsService
+      .findById(id)
+      .then((data) => successResponse(data, 'Food retrieved'));
   }
 
   @Get()
-  @ApiOperation({ summary: 'Search verified foods and your custom foods' })
+  @ApiOperation({ summary: 'Search foods with pagination and filters' })
   search(
     @CurrentUser() user: CurrentUserPayload,
     @Query() query: ListFoodsQueryDto,
   ) {
-    return this.foodsService.search(user.userId, query);
+    return this.foodsService.findAll(user.userId, query);
   }
 }

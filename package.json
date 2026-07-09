@@ -13,7 +13,8 @@
   },
   "prisma": {
     "schema": "db-schema/postgres/prisma/schema.prisma",
-    "migrations": "db-schema/postgres/prisma/migrations"
+    "migrations": "db-schema/postgres/prisma/migrations",
+    "seed": "dotenv -e .env -- ts-node --transpile-only db-schema/postgres/prisma/seed.ts"
   },
   "scripts": {
     "submodule:init": "git submodule update --init --recursive",
@@ -21,6 +22,7 @@
     "prisma:generate": "dotenv -e .env -- prisma generate",
     "prisma:migrate": "dotenv -e .env -- prisma migrate dev",
     "prisma:migrate:deploy": "dotenv -e .env -- prisma migrate deploy",
+    "prisma:seed": "dotenv -e .env -- prisma db seed",
     "prisma:prepare": "npm run prisma:generate && npm run prisma:migrate:deploy",
     "prebuild": "npm run submodule:init && npm run prisma:generate",
     "postinstall": "npm run submodule:init && npm run prisma:generate",
@@ -33,7 +35,9 @@
     "questions:set-time-limits": "dotenv -e .env -- ts-node --transpile-only scripts/set-question-time-limits.ts",
     "questions:backfill-time-limits": "dotenv -e .env -- ts-node --transpile-only scripts/backfill-question-time-limits.ts",
     "questions:validate-testcases": "dotenv -e .env -- ts-node --transpile-only scripts/validate-question-testcases.ts",
-    "lint": "eslint \"src/**/*.ts\" --fix"
+    "lint": "eslint \"src/**/*.ts\" --fix",
+    "test": "jest",
+    "test:unit": "jest --testPathPattern=food-preferences"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1073.0",
@@ -65,7 +69,9 @@
     "@eslint/js": "^9.18.0",
     "@nestjs/cli": "^11.0.0",
     "@nestjs/schematics": "^11.0.0",
+    "@nestjs/testing": "^11.1.28",
     "@types/express": "^5.0.0",
+    "@types/jest": "^29.5.14",
     "@types/node": "^24.0.0",
     "@types/passport-jwt": "^4.0.1",
     "@types/pg": "^8.20.0",
@@ -75,13 +81,28 @@
     "eslint-config-prettier": "^10.0.1",
     "eslint-plugin-prettier": "^5.2.2",
     "globals": "^17.0.0",
+    "jest": "^29.7.0",
     "prettier": "^3.4.2",
     "prisma": "^7.8.0",
     "source-map-support": "^0.5.21",
+    "ts-jest": "^29.4.11",
     "ts-loader": "^9.5.2",
     "ts-node": "^10.9.2",
     "tsconfig-paths": "^4.2.0",
     "typescript": "^5.7.3",
     "typescript-eslint": "^8.20.0"
+  },
+  "jest": {
+    "moduleFileExtensions": [
+      "js",
+      "json",
+      "ts"
+    ],
+    "rootDir": "src",
+    "testRegex": ".*\\.spec\\.ts$",
+    "transform": {
+      "^.+\\.(t|j)s$": "ts-jest"
+    },
+    "testEnvironment": "node"
   }
 }

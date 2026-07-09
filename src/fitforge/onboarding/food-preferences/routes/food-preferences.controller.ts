@@ -4,6 +4,7 @@ import {
   Delete,
   Get,
   Param,
+  Patch,
   Post,
 } from '@nestjs/common';
 import {
@@ -15,9 +16,9 @@ import {
 import { CurrentUser } from '../../../../common/decorators/current-user.decorator';
 import type { CurrentUserPayload } from '../../../../common/decorators/current-user.decorator';
 import { successResponse } from '../../../../common/utils/api-response';
-import { BulkFoodPreferencesDto } from '../dto/bulk-food-preferences.dto';
 import { CreateFoodPreferenceDto } from '../dto/create-food-preference.dto';
 import { FoodPreferenceResponseDto } from '../dto/food-preference-response.dto';
+import { PatchFoodPreferencesDto } from '../dto/patch-food-preferences.dto';
 import { FoodPreferencesService } from '../services/food-preferences.service';
 
 @ApiTags('Food Preferences')
@@ -26,19 +27,16 @@ import { FoodPreferencesService } from '../services/food-preferences.service';
 export class FoodPreferencesController {
   constructor(private readonly foodPreferencesService: FoodPreferencesService) {}
 
-  @Post('bulk')
-  @ApiOperation({ summary: 'Bulk save food preferences' })
-  bulk(
-    @CurrentUser() user: CurrentUserPayload,
-    @Body() dto: BulkFoodPreferencesDto,
-  ) {
+  @Get()
+  @ApiOperation({ summary: 'Get food and nutrition preferences' })
+  get(@CurrentUser() user: CurrentUserPayload) {
     return this.foodPreferencesService
-      .bulkSave(user.userId, dto)
-      .then((data) => successResponse(data, 'Preferences saved'));
+      .getPreferences(user.userId)
+      .then((data) => successResponse(data, 'Food preferences retrieved'));
   }
 
   @Post()
-  @ApiOperation({ summary: 'Add food preference' })
+  @ApiOperation({ summary: 'Add or update a single food preference' })
   @ApiResponse({ status: 201, type: FoodPreferenceResponseDto })
   add(
     @CurrentUser() user: CurrentUserPayload,
@@ -46,25 +44,30 @@ export class FoodPreferencesController {
   ) {
     return this.foodPreferencesService
       .add(user.userId, dto)
-      .then((data) => successResponse(data, 'Preference added'));
+      .then((data) => successResponse(data, 'Preference saved'));
   }
 
-  @Get()
-  @ApiOperation({ summary: 'Get food preferences' })
-  get(@CurrentUser() user: CurrentUserPayload) {
-    return this.foodPreferencesService
-      .findAll(user.userId)
-      .then((data) => successResponse(data));
-  }
-
-  @Delete(':id')
-  @ApiOperation({ summary: 'Delete food preference' })
-  remove(
+  @Patch()
+  @ApiOperation({ summary: 'Replace all food preferences (transactional)' })
+  replace(
     @CurrentUser() user: CurrentUserPayload,
-    @Param('id') id: string,
+    @Body() dto: PatchFoodPreferencesDto,
   ) {
     return this.foodPreferencesService
-      .remove(user.userId, id)
-      .then((data) => successResponse(data, 'Preference deleted'));
+      .replace(user.userId, dto)
+      .then((data) =>
+        successResponse(data, 'Food preferences saved successfully'),
+      );
+  }
+
+  @Delete(':foodId')
+  @ApiOperation({ summary: 'Remove a food from preferences' })
+  remove(
+    @CurrentUser() user: CurrentUserPayload,
+    @Param('foodId') foodId: string,
+  ) {
+    return this.foodPreferencesService
+      .removeByFoodId(user.userId, foodId)
+      .then((data) => successResponse(data, 'Preference removed'));
   }
 }

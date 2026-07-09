@@ -1,80 +1,106 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
-import { PrismaService } from '../../../../prisma/prisma.service';
-import { BulkFoodPreferencesDto } from '../dto/bulk-food-preferences.dto';
+import {
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
+import type { FoodPreferenceType } from '../../../../../db-schema/postgres/constants/fitforge-values';
 import { CreateFoodPreferenceDto } from '../dto/create-food-preference.dto';
+import { PatchFoodPreferencesDto } from '../dto/patch-food-preferences.dto';
+import { FoodPreferencesRepository } from '../repositories/food-preferences.repository';
+import { NutritionPreferencesRepository } from '../repositories/nutrition-preferences.repository';
+import {
+  assertNoDuplicateFoodIds,
+  flattenPreferenceGroups,
+  groupPreferences,
+} from '../utils/food-preferences.util';
+import { FoodsRepository } from '../../foods/repositories/foods.repository';
 
 @Injectable()
 export class FoodPreferencesService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly foodPreferencesRepository: FoodPreferencesRepository,
+    private readonly nutritionPreferencesRepository: NutritionPreferencesRepository,
+    private readonly foodsRepository: FoodsRepository,
+  ) {}
+
+  async getPreferences(userId: string) {
+    const [preferences, nutrition] = await Promise.all([
+      this.foodPreferencesRepository.getPreferences(userId),
+      this.nutritionPreferencesRepository.get(userId),
+    ]);
+    const grouped = groupPreferences(preferences);
+    return {
+      favorites: grouped.favorite,
+      available: grouped.available,
+      restricted: grouped.restricted,
+      allergies: grouped.allergy,
+      nutrition,
+    };
+  }
 
   async add(userId: string, dto: CreateFoodPreferenceDto) {
     await this.ensureFood(dto.foodId);
-    return this.prisma.userFoodPreference.upsert({
-      where: {
-        userId_foodId_preferenceType: {
-          userId,
-          foodId: dto.foodId,
-          preferenceType: dto.preferenceType,
-        },
-      },
-      create: { userId, ...dto },
-      update: {},
-      include: { food: true },
-    });
+    const pref = await this.foodPreferencesRepository.upsertPreference(
+      userId,
+      dto.foodId,
+      dto.preferenceType as FoodPreferenceType,
+    );
+    return pref;
   }
 
-  async findAll(userId: string) {
-    return this.prisma.userFoodPreference.findMany({
-      where: { userId },
-      include: { food: true },
-      orderBy: { createdAt: 'desc' },
-    });
-  }
+  async replace(userId: string, dto: PatchFoodPreferencesDto) {
+    const groups = {
+      favorites: dto.favorites,
+      available: dto.available,
+      restricted: dto.restricted,
+      allergies: dto.allergies,
+    };
+    assertNoDuplicateFoodIds(groups);
 
-  async remove(userId: string, id: string) {
-    const pref = await this.prisma.userFoodPreference.findFirst({
-      where: { id, userId },
-    });
-    if (!pref) {
-      throw new NotFoundException('Food preference not found');
-    }
-    await this.prisma.userFoodPreference.delete({ where: { id } });
-    return { id };
-  }
-
-  async bulkSave(userId: string, dto: BulkFoodPreferencesDto) {
-    const foodIds = [...dto.favorites, ...dto.restricted, ...dto.allergies];
+    const foodIds = [
+      ...dto.favorites,
+      ...dto.available,
+      ...dto.restricted,
+      ...dto.allergies,
+    ];
     await this.ensureFoods(foodIds);
 
-    await this.prisma.userFoodPreference.deleteMany({ where: { userId } });
+    const rows = flattenPreferenceGroups(groups);
+    const preferences = await this.foodPreferencesRepository.replacePreferences(
+      userId,
+      rows,
+    );
 
-    const rows = [
-      ...dto.favorites.map((foodId) => ({
+    let nutrition = await this.nutritionPreferencesRepository.get(userId);
+    if (dto.nutrition) {
+      nutrition = await this.nutritionPreferencesRepository.update(
         userId,
-        foodId,
-        preferenceType: 'favorite',
-      })),
-      ...dto.restricted.map((foodId) => ({
-        userId,
-        foodId,
-        preferenceType: 'restricted',
-      })),
-      ...dto.allergies.map((foodId) => ({
-        userId,
-        foodId,
-        preferenceType: 'allergy',
-      })),
-    ];
-
-    if (rows.length > 0) {
-      await this.prisma.userFoodPreference.createMany({ data: rows });
+        dto.nutrition,
+      );
     }
 
-    return this.findAll(userId);
+    const grouped = groupPreferences(preferences);
+    return {
+      favorites: grouped.favorite,
+      available: grouped.available,
+      restricted: grouped.restricted,
+      allergies: grouped.allergy,
+      nutrition,
+    };
+  }
+
+  async removeByFoodId(userId: string, foodId: string) {
+    const removed = await this.foodPreferencesRepository.removePreference(
+      userId,
+      foodId,
+    );
+    if (!removed) {
+      throw new NotFoundException('Food preference not found');
+    }
+    return { foodId };
   }
 
   private async ensureFood(foodId: string) {
-    const food = await this.prisma.foodMaster.findUnique({ where: { id: foodId } });
+    const food = await this.foodsRepository.findById(foodId);
     if (!food) {
       throw new NotFoundException('Food not found');
     }
@@ -85,9 +111,7 @@ export class FoodPreferencesService {
     if (unique.length === 0) {
       return;
     }
-    const count = await this.prisma.foodMaster.count({
-      where: { id: { in: unique } },
-    });
+    const count = await this.foodsRepository.countByIds(unique);
     if (count !== unique.length) {
       throw new NotFoundException('One or more foods not found');
     }
