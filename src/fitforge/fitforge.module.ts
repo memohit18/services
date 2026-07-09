@@ -4,6 +4,7 @@ import { UserOnboardingModule } from './onboarding/user-onboarding/user-onboardi
 import { FitnessModule } from './onboarding/fitness/fitness.module';
 import { FoodPreferencesModule } from './onboarding/food-preferences/food-preferences.module';
 import { FoodsModule } from './onboarding/foods/foods.module';
+import { NutritionPreferencesModule } from './onboarding/nutrition-preferences/nutrition-preferences.module';
 import { TransformationModule } from './planning/transformation/transformation.module';
 
 @Module({
@@ -13,6 +14,7 @@ import { TransformationModule } from './planning/transformation/transformation.m
     FitnessModule,
     FoodPreferencesModule,
     FoodsModule,
+    NutritionPreferencesModule,
     TransformationModule,
   ],
 })

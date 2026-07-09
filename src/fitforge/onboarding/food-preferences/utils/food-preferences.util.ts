@@ -5,7 +5,6 @@ export interface PreferenceGroups {
   favorites: string[];
   available: string[];
   restricted: string[];
-  allergies: string[];
 }
 
 export function assertNoDuplicateFoodIds(groups: PreferenceGroups): void {
@@ -14,7 +13,6 @@ export function assertNoDuplicateFoodIds(groups: PreferenceGroups): void {
     ['favorite', groups.favorites],
     ['available', groups.available],
     ['restricted', groups.restricted],
-    ['allergy', groups.allergies],
   ];
 
   for (const [type, foodIds] of entries) {
@@ -47,10 +45,6 @@ export function flattenPreferenceGroups(groups: PreferenceGroups): Array<{
       foodId,
       preferenceType: 'restricted' as const,
     })),
-    ...groups.allergies.map((foodId) => ({
-      foodId,
-      preferenceType: 'allergy' as const,
-    })),
   ];
 }
 
@@ -61,6 +55,5 @@ export function groupPreferences<
     favorite: preferences.filter((p) => p.preferenceType === 'favorite'),
     available: preferences.filter((p) => p.preferenceType === 'available'),
     restricted: preferences.filter((p) => p.preferenceType === 'restricted'),
-    allergy: preferences.filter((p) => p.preferenceType === 'allergy'),
   };
 }

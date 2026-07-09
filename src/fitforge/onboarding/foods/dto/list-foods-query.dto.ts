@@ -1,15 +1,14 @@
 import { ApiPropertyOptional } from '@nestjs/swagger';
 import { IsIn, IsOptional, IsString } from 'class-validator';
-import { DIET_TYPES } from '../../../../../db-schema/postgres/constants/fitforge-values';
+import { DIET_TYPES, FOOD_CATEGORIES } from '../../../../../db-schema/postgres/constants/fitforge-values';
 import { PaginationQueryDto } from '../../../../common/dto/pagination-query.dto';
-import { FOOD_CATEGORY_VALUES } from '../../food-preferences/constants/food-preferences.enums';
 
 const DIET_TYPE_INPUT = [...DIET_TYPES, 'veg', 'non_veg'] as const;
 
 export class ListFoodsQueryDto extends PaginationQueryDto {
-  @ApiPropertyOptional({ enum: FOOD_CATEGORY_VALUES, example: 'protein' })
+  @ApiPropertyOptional({ enum: FOOD_CATEGORIES, example: 'protein' })
   @IsOptional()
-  @IsIn(FOOD_CATEGORY_VALUES)
+  @IsIn(FOOD_CATEGORIES)
   category?: string;
 
   @ApiPropertyOptional({ example: 'vegetarian' })

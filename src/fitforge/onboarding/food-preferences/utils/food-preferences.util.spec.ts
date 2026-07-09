@@ -5,44 +5,37 @@ import {
 } from './food-preferences.util';
 
 describe('food-preferences.util', () => {
-  describe('assertNoDuplicateFoodIds', () => {
-    it('allows unique food IDs across groups', () => {
-      expect(() =>
-        assertNoDuplicateFoodIds({
-          favorites: ['a'],
-          available: ['b'],
-          restricted: ['c'],
-          allergies: ['d'],
-        }),
-      ).not.toThrow();
-    });
-
-    it('rejects duplicate food IDs across groups', () => {
-      expect(() =>
-        assertNoDuplicateFoodIds({
-          favorites: ['a', 'b'],
-          available: ['b'],
-          restricted: [],
-          allergies: [],
-        }),
-      ).toThrow(BadRequestException);
-    });
+  it('allows unique food IDs across groups', () => {
+    expect(() =>
+      assertNoDuplicateFoodIds({
+        favorites: ['a'],
+        available: ['b'],
+        restricted: ['c'],
+      }),
+    ).not.toThrow();
   });
 
-  describe('flattenPreferenceGroups', () => {
-    it('maps groups to preference rows', () => {
-      const rows = flattenPreferenceGroups({
+  it('rejects duplicate food IDs across groups', () => {
+    expect(() =>
+      assertNoDuplicateFoodIds({
+        favorites: ['a', 'b'],
+        available: ['b'],
+        restricted: [],
+      }),
+    ).toThrow(BadRequestException);
+  });
+
+  it('maps groups to preference rows', () => {
+    expect(
+      flattenPreferenceGroups({
         favorites: ['f1'],
         available: ['a1'],
         restricted: ['r1'],
-        allergies: ['al1'],
-      });
-      expect(rows).toEqual([
-        { foodId: 'f1', preferenceType: 'favorite' },
-        { foodId: 'a1', preferenceType: 'available' },
-        { foodId: 'r1', preferenceType: 'restricted' },
-        { foodId: 'al1', preferenceType: 'allergy' },
-      ]);
-    });
+      }),
+    ).toEqual([
+      { foodId: 'f1', preferenceType: 'favorite' },
+      { foodId: 'a1', preferenceType: 'available' },
+      { foodId: 'r1', preferenceType: 'restricted' },
+    ]);
   });
 });

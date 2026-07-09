@@ -1,7 +1,5 @@
-import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { Type } from 'class-transformer';
-import { IsArray, IsOptional, IsUUID, ValidateNested } from 'class-validator';
-import { NutritionPreferenceDto } from './nutrition-preference.dto';
+import { ApiProperty } from '@nestjs/swagger';
+import { IsArray, IsUUID } from 'class-validator';
 
 export class PatchFoodPreferencesDto {
   @ApiProperty({ type: [String], description: 'Favorite food IDs' })
@@ -9,7 +7,7 @@ export class PatchFoodPreferencesDto {
   @IsUUID('4', { each: true })
   favorites: string[];
 
-  @ApiProperty({ type: [String], description: 'Available / willing-to-eat food IDs' })
+  @ApiProperty({ type: [String], description: 'Available food IDs' })
   @IsArray()
   @IsUUID('4', { each: true })
   available: string[];
@@ -18,15 +16,4 @@ export class PatchFoodPreferencesDto {
   @IsArray()
   @IsUUID('4', { each: true })
   restricted: string[];
-
-  @ApiProperty({ type: [String], description: 'Allergy food IDs' })
-  @IsArray()
-  @IsUUID('4', { each: true })
-  allergies: string[];
-
-  @ApiPropertyOptional({ type: NutritionPreferenceDto })
-  @IsOptional()
-  @ValidateNested()
-  @Type(() => NutritionPreferenceDto)
-  nutrition?: NutritionPreferenceDto;
 }

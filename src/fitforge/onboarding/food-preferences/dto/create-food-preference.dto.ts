@@ -1,6 +1,6 @@
 import { ApiProperty } from '@nestjs/swagger';
 import { IsEnum, IsUUID } from 'class-validator';
-import { FoodPreferenceTypeEnum } from '../constants/food-preferences.enums';
+import { FoodPreferenceTypeEnum } from './food-preference.enums';
 
 export class CreateFoodPreferenceDto {
   @ApiProperty({ format: 'uuid' })
