@@ -24,6 +24,7 @@
     "prisma:migrate:deploy": "dotenv -e .env -- prisma migrate deploy",
     "prisma:seed": "dotenv -e .env -- prisma db seed",
     "prisma:prepare": "npm run prisma:generate && npm run prisma:migrate:deploy",
+    "deploy:db": "npm run submodule:init && npm run prisma:prepare",
     "prebuild": "npm run submodule:init && npm run prisma:generate",
     "postinstall": "npm run submodule:init && npm run prisma:generate",
     "build": "nest build",
