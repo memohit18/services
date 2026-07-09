@@ -4,6 +4,7 @@ import { PrismaService } from '../../../../prisma/prisma.service';
 import { FitnessProfileService } from '../../fitness-profile/services/fitness-profile.service';
 import { PhysiqueGoalsService } from '../../physique-goals/services/physique-goals.service';
 import { UserOnboardingService } from '../../user-onboarding/services/user-onboarding.service';
+import { TransformationService } from '../../../planning/transformation/services/transformation.service';
 import type { CreateFitnessProfileApiDto } from '../dto/fitness-profile-api.dto';
 import type { UpdateFitnessProfileApiDto } from '../dto/fitness-profile-api.dto';
 import {
@@ -24,6 +25,7 @@ export class FitnessApiService {
     private readonly fitnessProfileService: FitnessProfileService,
     private readonly physiqueGoalsService: PhysiqueGoalsService,
     private readonly onboardingService: UserOnboardingService,
+    private readonly transformationService: TransformationService,
   ) {}
 
   async getGoals() {
@@ -49,6 +51,7 @@ export class FitnessApiService {
 
     if (dto.onboardingCompleted) {
       await this.onboardingService.complete(userId);
+      await this.transformationService.generate(userId);
     }
 
     return this.buildProfileResponse(userId, profile);
@@ -67,6 +70,7 @@ export class FitnessApiService {
 
     if (dto.onboardingCompleted) {
       await this.onboardingService.complete(userId);
+      await this.transformationService.generate(userId);
     }
 
     return this.buildProfileResponse(userId, profile);

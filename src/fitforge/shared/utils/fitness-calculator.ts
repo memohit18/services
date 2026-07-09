@@ -15,6 +15,7 @@ export type FitnessMetricsInput = {
   gender: string;
   activityLevel: string;
   fitnessGoal?: string;
+  targetWeightKg?: number;
 };
 
 export function calculateBMI(weightKg: number, heightCm: number): number {
@@ -36,22 +37,38 @@ export function calculateTDEE(bmr: number, activityLevel: string): number {
   return round0(bmr * multiplier);
 }
 
-export function calculateProteinTarget(weightKg: number, fitnessGoal?: string): number {
+export function calculateProteinTarget(
+  targetWeightKg: number,
+  fitnessGoal?: string,
+): number {
+  const goal = normalizeGoal(fitnessGoal);
   const multiplier =
-    fitnessGoal === 'muscle_gain' ? 2.0 : fitnessGoal === 'fat_loss' ? 1.8 : 1.6;
-  return round0(weightKg * multiplier);
+    goal === 'fat_loss' || goal === 'weight_loss'
+      ? 2.2
+      : goal === 'muscle_gain' || goal === 'lean_bulk'
+        ? 2.0
+        : 1.6;
+  return round0(targetWeightKg * multiplier);
 }
 
 export function calculateTargetCalories(
   tdee: number,
   fitnessGoal?: string,
 ): number {
-  switch (fitnessGoal) {
+  const goal = normalizeGoal(fitnessGoal);
+  switch (goal) {
     case 'fat_loss':
+    case 'weight_loss':
       return round0(tdee - 500);
+    case 'lean_bulk':
+      return round0(tdee + 250);
     case 'muscle_gain':
-      return round0(tdee + 300);
+      return round0(tdee + 350);
+    case 'maintenance':
+    case 'maintain_weight':
+      return round0(tdee);
     case 'recomposition':
+    case 'body_recomposition':
       return round0(tdee - 200);
     default:
       return round0(tdee);
@@ -67,7 +84,11 @@ export function calculateEstimatedWeeks(
   if (diff === 0) {
     return 0;
   }
-  const weeklyRate = fitnessGoal === 'muscle_gain' ? 0.35 : 0.5;
+  const goal = normalizeGoal(fitnessGoal);
+  const weeklyRate =
+    goal === 'muscle_gain' || goal === 'lean_bulk'
+      ? 0.25
+      : 0.5;
   return Math.max(1, Math.ceil(diff / weeklyRate));
 }
 
@@ -85,10 +106,18 @@ export function calculateFitnessMetrics(input: FitnessMetricsInput) {
   const bmr = calculateBMR(input);
   const bmi = calculateBMI(input.weightKg, input.heightCm);
   const tdee = calculateTDEE(bmr, input.activityLevel);
-  const proteinTarget = calculateProteinTarget(input.weightKg, input.fitnessGoal);
+  const proteinWeight = input.targetWeightKg ?? input.weightKg;
+  const proteinTarget = calculateProteinTarget(proteinWeight, input.fitnessGoal);
   const dailyCalorieTarget = calculateTargetCalories(tdee, input.fitnessGoal);
 
   return { bmi, bmr, tdee, proteinTarget, dailyCalorieTarget };
+}
+
+function normalizeGoal(fitnessGoal?: string): string {
+  if (!fitnessGoal) {
+    return 'maintenance';
+  }
+  return fitnessGoal;
 }
 
 function round0(value: number): number {
