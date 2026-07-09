@@ -2,6 +2,7 @@ import { Module } from '@nestjs/common';
 import { CacheModule } from './infrastructure/cache/cache.module';
 import { RedisModule } from './infrastructure/redis/redis.module';
 import { UserOnboardingModule } from './onboarding/user-onboarding/user-onboarding.module';
+import { FitnessModule } from './onboarding/fitness/fitness.module';
 import { FitnessProfileModule } from './onboarding/fitness-profile/fitness-profile.module';
 import { FoodPreferencesModule } from './onboarding/food-preferences/food-preferences.module';
 import { FoodsModule } from './onboarding/foods/foods.module';
@@ -24,6 +25,7 @@ import { AiGenerationModule } from './ai/generation/ai-generation.module';
     RedisModule,
     GeminiModule,
     UserOnboardingModule,
+    FitnessModule,
     FitnessProfileModule,
     PhysiqueGoalsModule,
     FoodPreferencesModule,

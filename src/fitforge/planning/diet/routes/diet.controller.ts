@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Param, Post, Query } from '@nestjs/common';
+import { Body, Controller, Get, Param, Patch, Post, Query } from '@nestjs/common';
 import {
   ApiBearerAuth,
   ApiOperation,
@@ -16,6 +16,9 @@ import {
   DietPlanResponseDto,
   toDietPlanResponse,
 } from '../dto/diet-plan-response.dto';
+import { AddHydrationDto } from '../dto/add-hydration.dto';
+import { DietPlannerQueryDto } from '../dto/diet-planner-query.dto';
+import { DietPlannerService } from '../services/diet-planner.service';
 import { DietService } from '../services/diet.service';
 
 @ApiTags('Diet')
@@ -25,7 +28,33 @@ export class DietController {
   constructor(
     private readonly dietService: DietService,
     private readonly aiDietTargets: AiDietTargetsService,
+    private readonly dietPlannerService: DietPlannerService,
   ) {}
+
+  @Get('planner')
+  @ApiOperation({
+    summary:
+      'Diet Planner dashboard — today’s meals, macros, hydration, coach insight, swap suggestion',
+  })
+  getPlanner(
+    @CurrentUser() user: CurrentUserPayload,
+    @Query() query: DietPlannerQueryDto,
+  ) {
+    return this.dietPlannerService
+      .getDashboard(user.userId, query.date)
+      .then((data) => successResponse(data));
+  }
+
+  @Patch('planner/hydration')
+  @ApiOperation({ summary: 'Add water intake for today (creates partial check-in if needed)' })
+  addHydration(
+    @CurrentUser() user: CurrentUserPayload,
+    @Body() dto: AddHydrationDto,
+  ) {
+    return this.dietPlannerService
+      .addHydration(user.userId, dto.amountMl)
+      .then((data) => successResponse(data, 'Hydration updated'));
+  }
 
   @Post('generate-targets')
   @ApiOperation({
