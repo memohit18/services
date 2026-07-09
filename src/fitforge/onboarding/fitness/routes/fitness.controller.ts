@@ -13,7 +13,6 @@ import {
   ApiResponse,
   ApiTags,
 } from '@nestjs/swagger';
-import { Public } from '../../../../auth/decorators/public.decorator';
 import { CurrentUser } from '../../../../common/decorators/current-user.decorator';
 import type { CurrentUserPayload } from '../../../../common/decorators/current-user.decorator';
 import { successResponse } from '../../../../common/utils/api-response';
@@ -24,14 +23,15 @@ import {
 import { FitnessApiService } from '../services/fitness-api.service';
 
 @ApiTags('Fitness (Frontend API)')
+@ApiBearerAuth()
 @Controller('fitness')
 export class FitnessController {
   constructor(private readonly fitnessApiService: FitnessApiService) {}
 
-  @Public()
   @Get('goals')
   @ApiOperation({ summary: 'List physique goals for onboarding Step 5' })
   @ApiResponse({ status: 200, description: '{ goals: [{ id, title, description, imageUrl }] }' })
+  @ApiResponse({ status: 401, description: 'Unauthorized' })
   getGoals() {
     return this.fitnessApiService
       .getGoals()
@@ -39,9 +39,9 @@ export class FitnessController {
   }
 
   @Get('profile')
-  @ApiBearerAuth()
   @ApiOperation({ summary: 'Get authenticated user fitness profile' })
   @ApiResponse({ status: 200 })
+  @ApiResponse({ status: 401, description: 'Unauthorized' })
   @ApiResponse({ status: 404, description: 'Profile not found' })
   getProfile(@CurrentUser() user: CurrentUserPayload) {
     return this.fitnessApiService
@@ -50,10 +50,10 @@ export class FitnessController {
   }
 
   @Post('profile')
-  @ApiBearerAuth()
   @HttpCode(HttpStatus.CREATED)
   @ApiOperation({ summary: 'Create fitness profile (first-time onboarding)' })
   @ApiResponse({ status: 201 })
+  @ApiResponse({ status: 401, description: 'Unauthorized' })
   @ApiResponse({ status: 409, description: 'Profile already exists' })
   createProfile(
     @CurrentUser() user: CurrentUserPayload,
@@ -67,9 +67,9 @@ export class FitnessController {
   }
 
   @Patch('profile')
-  @ApiBearerAuth()
   @ApiOperation({ summary: 'Partially update fitness profile' })
   @ApiResponse({ status: 200 })
+  @ApiResponse({ status: 401, description: 'Unauthorized' })
   @ApiResponse({ status: 404, description: 'Profile not found' })
   updateProfile(
     @CurrentUser() user: CurrentUserPayload,
