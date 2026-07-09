@@ -55,6 +55,31 @@ export function normalizeFoodCategory(value: string): FoodCategory {
   );
 }
 
+export function transformFoodCategoryInput(value: unknown): string | undefined {
+  if (value === undefined) {
+    return undefined;
+  }
+  if (typeof value === 'string' && value.length > 0) {
+    return normalizeFoodCategory(value);
+  }
+  return undefined;
+}
+
+export function transformFoodCategoryUpdate(
+  value: unknown,
+): string | null | undefined {
+  if (value === undefined) {
+    return undefined;
+  }
+  if (value === null || value === '') {
+    return null;
+  }
+  if (typeof value === 'string') {
+    return normalizeFoodCategory(value);
+  }
+  return undefined;
+}
+
 export const FOOD_CATEGORY_LABELS: Record<FoodCategory, string> = {
   breakfast: 'Breakfast',
   staple: 'Staple',

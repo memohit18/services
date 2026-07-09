@@ -54,6 +54,23 @@ export class FoodsRepository {
     return this.prisma.foodMaster.findUnique({ where: { id } });
   }
 
+  async findAccessibleById(id: string, userId: string): Promise<FoodMaster | null> {
+    return this.prisma.foodMaster.findFirst({
+      where: {
+        id,
+        OR: [{ isVerified: true }, { isCustom: true, createdByUserId: userId }],
+      },
+    });
+  }
+
+  async create(data: Prisma.FoodMasterCreateInput): Promise<FoodMaster> {
+    return this.prisma.foodMaster.create({ data });
+  }
+
+  async update(id: string, data: Prisma.FoodMasterUpdateInput): Promise<FoodMaster> {
+    return this.prisma.foodMaster.update({ where: { id }, data });
+  }
+
   async countByIds(ids: string[]): Promise<number> {
     if (ids.length === 0) {
       return 0;
@@ -63,7 +80,7 @@ export class FoodsRepository {
 
   private buildWhere(params: FoodSearchParams): Prisma.FoodMasterWhereInput {
     const where: Prisma.FoodMasterWhereInput = {
-      isVerified: true,
+      OR: [{ isVerified: true }, { isCustom: true, createdByUserId: params.userId }],
     };
 
     if (params.category) {

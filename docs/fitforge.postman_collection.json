@@ -39,6 +39,10 @@
         { "name": "GET Search Foods", "request": { "method": "GET", "url": "{{baseUrl}}/foods?page=1&limit=20&search=paneer&category=protein" } },
         { "name": "GET Search Foods (carbs alias)", "request": { "method": "GET", "url": "{{baseUrl}}/foods?page=1&limit=20&category=carbs" } },
         { "name": "GET Food Categories", "request": { "method": "GET", "url": "{{baseUrl}}/foods/categories" } },
+        { "name": "POST Custom Food", "request": { "method": "POST", "header": [{ "key": "Content-Type", "value": "application/json" }], "url": "{{baseUrl}}/foods/custom", "body": { "mode": "raw", "raw": "{\n  \"name\": \"Mom's Paneer Curry\",\n  \"category\": \"protein\",\n  \"dietType\": \"veg\",\n  \"servingSize\": \"1 bowl\",\n  \"calories\": 320,\n  \"protein\": 18,\n  \"carbs\": 12,\n  \"fats\": 22\n}" } } },
+        { "name": "POST Create Food (admin)", "request": { "method": "POST", "header": [{ "key": "Content-Type", "value": "application/json" }], "url": "{{baseUrl}}/foods", "body": { "mode": "raw", "raw": "{\n  \"name\": \"Egg\",\n  \"category\": \"protein\",\n  \"dietType\": \"eggetarian\",\n  \"servingSize\": \"1 large\",\n  \"calories\": 78,\n  \"protein\": 6,\n  \"carbs\": 0.6,\n  \"fats\": 5\n}" } } },
+        { "name": "PATCH Update Food Category", "request": { "method": "PATCH", "header": [{ "key": "Content-Type", "value": "application/json" }], "url": "{{baseUrl}}/foods/{{foodId}}", "body": { "mode": "raw", "raw": "{\n  \"category\": \"grain\"\n}" } } },
+        { "name": "PATCH Remove Food Category", "request": { "method": "PATCH", "header": [{ "key": "Content-Type", "value": "application/json" }], "url": "{{baseUrl}}/foods/{{foodId}}", "body": { "mode": "raw", "raw": "{\n  \"category\": null\n}" } } },
         { "name": "GET Food By ID", "request": { "method": "GET", "url": "{{baseUrl}}/foods/{{foodId}}" } }
       ]
     },

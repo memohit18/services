@@ -1,5 +1,5 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { Type } from 'class-transformer';
+import { Transform, Type } from 'class-transformer';
 import {
   IsIn,
   IsInt,
@@ -9,7 +9,8 @@ import {
   Min,
   MinLength,
 } from 'class-validator';
-import { DIET_TYPES } from '../../../../../db-schema/postgres/constants/fitforge-values';
+import { DIET_TYPES, FOOD_CATEGORIES } from '../../../../../db-schema/postgres/constants/fitforge-values';
+import { transformFoodCategoryInput } from '../constants/food-category.normalizer';
 
 const DIET_TYPE_INPUT = [...DIET_TYPES, 'veg', 'non_veg'] as const;
 
@@ -19,9 +20,14 @@ export class CreateCustomFoodDto {
   @MinLength(2)
   name: string;
 
-  @ApiPropertyOptional({ example: 'protein' })
+  @ApiPropertyOptional({
+    enum: FOOD_CATEGORIES,
+    example: 'protein',
+    description: 'Aliases accepted: carbs→grain, vegetables→vegetable',
+  })
   @IsOptional()
-  @IsString()
+  @Transform(({ value }) => transformFoodCategoryInput(value))
+  @IsIn(FOOD_CATEGORIES)
   category?: string;
 
   @ApiPropertyOptional({ example: 'veg' })
