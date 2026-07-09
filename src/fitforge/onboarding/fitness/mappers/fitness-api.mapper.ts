@@ -5,6 +5,13 @@ import type { UpdateFitnessProfileDto } from '../../fitness-profile/dto/update-f
 const GOALS_IMAGE_BASE =
   process.env.FITNESS_GOALS_IMAGE_BASE ?? 'https://cdn.fitforge.app/goals';
 
+function toIsoString(value: Date | string): string {
+  if (value instanceof Date) {
+    return value.toISOString();
+  }
+  return new Date(value).toISOString();
+}
+
 export type FitnessGoalApi = {
   id: string;
   title: string;
@@ -139,8 +146,8 @@ export function toFitnessProfileApi(
     allergies: profile.allergies,
     onboardingCompleted,
     physiqueGoal: goalApi,
-    createdAt: profile.createdAt.toISOString(),
-    updatedAt: profile.updatedAt.toISOString(),
+    createdAt: toIsoString(profile.createdAt),
+    updatedAt: toIsoString(profile.updatedAt),
   };
 }
 
