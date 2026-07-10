@@ -13,7 +13,7 @@ export class AnalyticsRepository {
   ) {}
 
   async loadAnalyticsContext(userId: string, from?: Date, to?: Date) {
-    const [logs, transformation, profile, mealLogs, checkins] =
+    const [logs, transformation, profile, mealLogs, checkins, workoutSessions] =
       await Promise.all([
         this.progressRepository.findAllAsc(userId, from, to),
         this.prisma.transformationTarget.findFirst({
@@ -56,8 +56,45 @@ export class AnalyticsRepository {
           orderBy: { checkInDate: 'desc' },
           take: 90,
         }),
+        this.prisma.workoutSessionLog.findMany({
+          where: {
+            userId,
+            ...(from || to
+              ? {
+                  OR: [
+                    {
+                      completedAt: {
+                        ...(from ? { gte: from } : {}),
+                        ...(to ? { lt: to } : {}),
+                      },
+                    },
+                    {
+                      completedAt: null,
+                      createdAt: {
+                        ...(from ? { gte: from } : {}),
+                        ...(to ? { lt: to } : {}),
+                      },
+                    },
+                  ],
+                }
+              : {}),
+          },
+          select: {
+            status: true,
+            completedAt: true,
+            createdAt: true,
+          },
+          take: 200,
+        }),
       ]);
 
-    return { logs, transformation, profile, mealLogs, checkins };
+    return {
+      logs,
+      transformation,
+      profile,
+      mealLogs,
+      checkins,
+      workoutSessions,
+    };
   }
 }

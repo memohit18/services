@@ -118,6 +118,7 @@
         { "name": "GET Latest Progress", "request": { "method": "GET", "url": "{{baseUrl}}/progress/latest" } },
         { "name": "GET Progress History", "request": { "method": "GET", "url": "{{baseUrl}}/progress/history?page=1&limit=20&from=2026-01-01&to=2026-07-11" } },
         { "name": "GET Progress Analytics", "request": { "method": "GET", "url": "{{baseUrl}}/progress/analytics" } },
+        { "name": "GET Progress Dashboard", "request": { "method": "GET", "url": "{{baseUrl}}/progress/dashboard", "description": "Latest + analytics + narrative insights (lost Xkg / compliance / ETA pace)" } },
         { "name": "POST Presign Upload (R2)", "request": { "method": "POST", "header": [{ "key": "Content-Type", "value": "application/json" }], "url": "{{baseUrl}}/uploads/presigned-url", "body": { "mode": "raw", "raw": "{\n  \"fileName\": \"front.jpg\",\n  \"contentType\": \"image/jpeg\",\n  \"size\": 245000,\n  \"category\": \"progress\",\n  \"photoType\": \"front\"\n}" } } },
         { "name": "POST Progress Photos", "request": { "method": "POST", "header": [{ "key": "Content-Type", "value": "application/json" }], "url": "{{baseUrl}}/progress/photos", "body": { "mode": "raw", "raw": "{\n  \"frontImageUrl\": \"https://cdn.example.com/uploads/user/front.jpg\",\n  \"sideImageUrl\": \"https://cdn.example.com/uploads/user/side.jpg\",\n  \"backImageUrl\": \"https://cdn.example.com/uploads/user/back.jpg\"\n}" } } },
         { "name": "GET Progress Photos", "request": { "method": "GET", "url": "{{baseUrl}}/progress/photos?page=1&limit=20" } },

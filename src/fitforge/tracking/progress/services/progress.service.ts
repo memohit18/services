@@ -145,6 +145,33 @@ export class ProgressService {
     return computeProgressAnalytics(ctx);
   }
 
+  /**
+   * Progress dashboard — latest entry + full analytics/insights for the UI.
+   */
+  async getDashboard(userId: string, query: ProgressAnalyticsQueryDto = {}) {
+    const analytics = await this.getAnalytics(userId, query);
+    const latest = await this.progressRepository.findLatest(userId);
+    const photoCount = await this.photoRepository.count(userId);
+
+    return {
+      latest: latest ? toProgressLogResponse(latest) : null,
+      photoCount,
+      analytics,
+      insights: analytics.insights,
+      transformation: {
+        goalCompletionPercent: analytics.goalCompletionPercent,
+        transformationPercent: analytics.transformationPercent,
+        estimatedCompletionDate: analytics.estimatedCompletionDate,
+        etaWeeks: analytics.etaWeeks,
+        weeksAheadOfPlan: analytics.weeksAheadOfPlan,
+        plannedEtaWeeks: analytics.plannedEtaWeeks,
+        startWeightKg: analytics.startWeightKg,
+        latestWeightKg: analytics.latestWeightKg,
+        targetWeightKg: analytics.targetWeightKg,
+      },
+    };
+  }
+
   async createPhotos(userId: string, dto: CreateProgressPhotosDto) {
     if (!dto.frontImageUrl && !dto.sideImageUrl && !dto.backImageUrl) {
       throw new BadRequestException(

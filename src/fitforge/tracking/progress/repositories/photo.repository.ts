@@ -27,6 +27,10 @@ export class PhotoRepository {
     ]);
   }
 
+  count(userId: string) {
+    return this.prisma.progressPhoto.count({ where: { userId } });
+  }
+
   delete(id: string) {
     return this.prisma.progressPhoto.delete({ where: { id } });
   }

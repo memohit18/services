@@ -74,7 +74,7 @@ export class ProgressController {
   @Get('analytics')
   @ApiOperation({
     summary:
-      'Progress analytics — trends, weekly change, goal %, ETA, consistency',
+      'Progress analytics — trends, weekly change, goal %, ETA, consistency, narrative insights',
   })
   getAnalytics(
     @CurrentUser() user: CurrentUserPayload,
@@ -82,6 +82,20 @@ export class ProgressController {
   ) {
     return this.progressService
       .getAnalytics(user.userId, query)
+      .then((data) => successResponse(data));
+  }
+
+  @Get('dashboard')
+  @ApiOperation({
+    summary:
+      'Progress dashboard — latest log + analytics + addictive narrative insights',
+  })
+  getDashboard(
+    @CurrentUser() user: CurrentUserPayload,
+    @Query() query: ProgressAnalyticsQueryDto,
+  ) {
+    return this.progressService
+      .getDashboard(user.userId, query)
       .then((data) => successResponse(data));
   }
 
