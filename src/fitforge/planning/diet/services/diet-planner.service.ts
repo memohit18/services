@@ -68,7 +68,10 @@ export class DietPlannerService {
           where: { userId_checkInDate: { userId, checkInDate: date } },
         }),
         this.prisma.workoutPlan
-          .findFirst({ where: { userId, status: 'active' } })
+          .findFirst({
+            where: { userId, status: 'active' },
+            select: { id: true },
+          })
           .then((plan) => plan != null),
       ]);
 
