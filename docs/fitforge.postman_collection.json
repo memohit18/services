@@ -1,14 +1,15 @@
 {
   "info": {
     "name": "FitForge API",
-    "description": "# Setup\n1. Set `baseUrl` (default http://localhost:3303)\n2. Set `accessToken` from auth-service\n\nAll routes use Bearer auth unless noted.\n\n# Response envelope\n```json\n{ \"success\": true, \"message\": \"...\", \"data\": {} }\n```\n\n# Phases\n- **01** Fitness Profile (Phase 1)\n- **02** Transformation (Phase 2)\n- **03** Foods, Food Preferences & Nutrition Preferences (Phase 3)",
+    "description": "# Setup\n1. Set `baseUrl` (default http://localhost:3303)\n2. Set `accessToken` from auth-service\n\nAll routes use Bearer auth unless noted.\n\n# Response envelope\n```json\n{ \"success\": true, \"message\": \"...\", \"data\": {} }\n```\n\n# Phases\n- **01** Fitness Profile (Phase 1)\n- **02** Transformation (Phase 2)\n- **03** Foods, Food Preferences & Nutrition Preferences (Phase 3)\n- **04** AI Diet Planner (Phase 4)",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
   },
   "variable": [
     { "key": "baseUrl", "value": "http://localhost:3303" },
     { "key": "accessToken", "value": "" },
     { "key": "transformationId", "value": "" },
-    { "key": "foodId", "value": "" }
+    { "key": "foodId", "value": "" },
+    { "key": "dietPlanId", "value": "" }
   ],
   "auth": {
     "type": "bearer",
@@ -62,6 +63,22 @@
         { "name": "POST Nutrition Preferences", "request": { "method": "POST", "header": [{ "key": "Content-Type", "value": "application/json" }], "url": "{{baseUrl}}/nutrition-preferences", "body": { "mode": "raw", "raw": "{\n  \"budgetCategory\": \"moderate\",\n  \"preferredCuisine\": \"indian\",\n  \"mealsPerDay\": 4,\n  \"cookingTimeMinutes\": 30,\n  \"preferredMealTiming\": \"flexible\"\n}" } } },
         { "name": "PATCH Nutrition Preferences", "request": { "method": "PATCH", "header": [{ "key": "Content-Type", "value": "application/json" }], "url": "{{baseUrl}}/nutrition-preferences", "body": { "mode": "raw", "raw": "{\n  \"mealsPerDay\": 5,\n  \"cookingTimeMinutes\": 45\n}" } } },
         { "name": "DELETE Nutrition Preferences", "request": { "method": "DELETE", "url": "{{baseUrl}}/nutrition-preferences" } }
+      ]
+    },
+    {
+      "name": "04 — AI Diet Planner (Phase 4)",
+      "item": [
+        { "name": "POST Generate Diet (Phase 4)", "request": { "method": "POST", "url": "{{baseUrl}}/diet/generate", "description": "AI → validate → save raw JSON on diet_plans → normalize to meal_plans/items" } },
+        { "name": "POST Regenerate Diet (Phase 4)", "request": { "method": "POST", "url": "{{baseUrl}}/diet/regenerate" } },
+        { "name": "POST Generate targets (legacy)", "request": { "method": "POST", "url": "{{baseUrl}}/diet/generate-targets" } },
+        { "name": "POST From targets (legacy)", "request": { "method": "POST", "header": [{ "key": "Content-Type", "value": "application/json" }], "url": "{{baseUrl}}/diet/from-targets", "body": { "mode": "raw", "raw": "{\n  \"goal\": \"muscle_gain\",\n  \"dailyCalories\": 2800,\n  \"protein\": 150,\n  \"carbs\": 320,\n  \"fats\": 80\n}" } } },
+        { "name": "POST Create diet (legacy)", "request": { "method": "POST", "header": [{ "key": "Content-Type", "value": "application/json" }], "url": "{{baseUrl}}/diet", "body": { "mode": "raw", "raw": "{\n  \"goal\": \"muscle_gain\",\n  \"caloriesTarget\": 2800,\n  \"proteinTarget\": 150,\n  \"carbsTarget\": 320,\n  \"fatsTarget\": 80\n}" } } },
+        { "name": "GET Active Diet", "request": { "method": "GET", "url": "{{baseUrl}}/diet/active" } },
+        { "name": "GET Diet History", "request": { "method": "GET", "url": "{{baseUrl}}/diet/history?page=1&limit=20" } },
+        { "name": "POST Activate Diet (legacy)", "request": { "method": "POST", "url": "{{baseUrl}}/diet/{{dietPlanId}}/activate" } },
+        { "name": "DELETE Diet (Phase 4)", "request": { "method": "DELETE", "url": "{{baseUrl}}/diet/{{dietPlanId}}" } },
+        { "name": "GET Diet Planner Dashboard", "request": { "method": "GET", "url": "{{baseUrl}}/diet/planner" } },
+        { "name": "PATCH Hydration", "request": { "method": "PATCH", "header": [{ "key": "Content-Type", "value": "application/json" }], "url": "{{baseUrl}}/diet/planner/hydration", "body": { "mode": "raw", "raw": "{\n  \"amountMl\": 250\n}" } } }
       ]
     }
   ]

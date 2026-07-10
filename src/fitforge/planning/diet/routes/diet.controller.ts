@@ -1,4 +1,13 @@
-import { Body, Controller, Get, Param, Patch, Post, Query } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Delete,
+  Get,
+  Param,
+  Patch,
+  Post,
+  Query,
+} from '@nestjs/common';
 import {
   ApiBearerAuth,
   ApiOperation,
@@ -10,13 +19,15 @@ import type { CurrentUserPayload } from '../../../../common/decorators/current-u
 import { PaginationQueryDto } from '../../../../common/dto/pagination-query.dto';
 import { successResponse } from '../../../../common/utils/api-response';
 import { AiDietTargetsService } from '../../../ai/generation/ai-diet-targets.service';
+import { AddHydrationDto } from '../dto/add-hydration.dto';
 import { CreateDietDto } from '../dto/create-diet.dto';
 import { CreateDietFromAiTargetsDto } from '../dto/create-diet-from-ai-targets.dto';
 import {
   DietPlanResponseDto,
+  GeneratedDietPlanResponseDto,
   toDietPlanResponse,
+  toGeneratedDietResponse,
 } from '../dto/diet-plan-response.dto';
-import { AddHydrationDto } from '../dto/add-hydration.dto';
 import { DietPlannerQueryDto } from '../dto/diet-planner-query.dto';
 import { DietPlannerService } from '../services/diet-planner.service';
 import { DietService } from '../services/diet.service';
@@ -31,35 +42,47 @@ export class DietController {
     private readonly dietPlannerService: DietPlannerService,
   ) {}
 
-  @Get('planner')
+  // ─── Phase 4 (new) ───────────────────────────────────────────────
+
+  @Post('generate')
   @ApiOperation({
     summary:
-      'Diet Planner dashboard — today’s meals, macros, hydration, coach insight, swap suggestion',
+      'Phase 4: Generate full AI diet — raw JSON on diet_plans + meal_plans/items',
   })
-  getPlanner(
-    @CurrentUser() user: CurrentUserPayload,
-    @Query() query: DietPlannerQueryDto,
-  ) {
-    return this.dietPlannerService
-      .getDashboard(user.userId, query.date)
-      .then((data) => successResponse(data));
+  @ApiResponse({ status: 201, type: GeneratedDietPlanResponseDto })
+  generate(@CurrentUser() user: CurrentUserPayload) {
+    return this.dietService
+      .generate(user.userId)
+      .then((result) =>
+        successResponse(
+          toGeneratedDietResponse(result),
+          'Diet plan generated successfully',
+        ),
+      );
   }
 
-  @Patch('planner/hydration')
-  @ApiOperation({ summary: 'Add water intake for today (creates partial check-in if needed)' })
-  addHydration(
-    @CurrentUser() user: CurrentUserPayload,
-    @Body() dto: AddHydrationDto,
-  ) {
-    return this.dietPlannerService
-      .addHydration(user.userId, dto.amountMl)
-      .then((data) => successResponse(data, 'Hydration updated'));
+  @Post('regenerate')
+  @ApiOperation({
+    summary: 'Phase 4: Regenerate AI diet (archives previous active)',
+  })
+  @ApiResponse({ status: 201, type: GeneratedDietPlanResponseDto })
+  regenerate(@CurrentUser() user: CurrentUserPayload) {
+    return this.dietService
+      .regenerate(user.userId)
+      .then((result) =>
+        successResponse(
+          toGeneratedDietResponse(result),
+          'Diet plan regenerated successfully',
+        ),
+      );
   }
+
+  // ─── Legacy (keep request/response contracts unchanged) ──────────
 
   @Post('generate-targets')
   @ApiOperation({
     summary:
-      'Generate diet macro targets — calories/protein from transformation engine, carbs/fats from AI',
+      'Legacy: Generate diet macro targets — calories/protein from transformation, carbs/fats from AI',
   })
   @ApiResponse({ type: DietPlanResponseDto })
   generateTargets(@CurrentUser() user: CurrentUserPayload) {
@@ -72,7 +95,8 @@ export class DietController {
 
   @Post('from-targets')
   @ApiOperation({
-    summary: 'Save AI macro targets (no meals) — use POST /meal-plans/generate next',
+    summary:
+      'Legacy: Save AI macro targets (no meals) — use POST /meal-plans/generate next',
   })
   @ApiResponse({ type: DietPlanResponseDto })
   createFromAiTargets(
@@ -87,7 +111,7 @@ export class DietController {
   }
 
   @Post()
-  @ApiOperation({ summary: 'Create diet plan version' })
+  @ApiOperation({ summary: 'Legacy: Create diet plan version (manual)' })
   @ApiResponse({ type: DietPlanResponseDto })
   create(
     @CurrentUser() user: CurrentUserPayload,
@@ -101,8 +125,8 @@ export class DietController {
   }
 
   @Get('active')
-  @ApiOperation({ summary: 'Get active diet plan' })
-  @ApiResponse({ type: DietPlanResponseDto })
+  @ApiOperation({ summary: 'Get active diet plan (legacy response shape)' })
+  @ApiResponse({ status: 200, type: DietPlanResponseDto })
   getActive(@CurrentUser() user: CurrentUserPayload) {
     return this.dietService
       .getActive(user.userId)
@@ -110,7 +134,7 @@ export class DietController {
   }
 
   @Get('history')
-  @ApiOperation({ summary: 'Get diet plan history' })
+  @ApiOperation({ summary: 'Get diet plan history (legacy response shape)' })
   getHistory(
     @CurrentUser() user: CurrentUserPayload,
     @Query() query: PaginationQueryDto,
@@ -124,8 +148,33 @@ export class DietController {
     }));
   }
 
+  @Get('planner')
+  @ApiOperation({
+    summary:
+      'Diet Planner dashboard — today’s meals, macros, hydration, coach insight',
+  })
+  getPlanner(
+    @CurrentUser() user: CurrentUserPayload,
+    @Query() query: DietPlannerQueryDto,
+  ) {
+    return this.dietPlannerService
+      .getDashboard(user.userId, query.date)
+      .then((data) => successResponse(data));
+  }
+
+  @Patch('planner/hydration')
+  @ApiOperation({ summary: 'Add water intake for today' })
+  addHydration(
+    @CurrentUser() user: CurrentUserPayload,
+    @Body() dto: AddHydrationDto,
+  ) {
+    return this.dietPlannerService
+      .addHydration(user.userId, dto.amountMl)
+      .then((data) => successResponse(data, 'Hydration updated'));
+  }
+
   @Post(':id/activate')
-  @ApiOperation({ summary: 'Activate diet plan version' })
+  @ApiOperation({ summary: 'Legacy: Activate diet plan version' })
   @ApiResponse({ type: DietPlanResponseDto })
   activate(
     @CurrentUser() user: CurrentUserPayload,
@@ -139,5 +188,16 @@ export class DietController {
           'Diet plan activated',
         ),
       );
+  }
+
+  @Delete(':id')
+  @ApiOperation({ summary: 'Phase 4: Delete a diet plan and its meal plans' })
+  remove(
+    @CurrentUser() user: CurrentUserPayload,
+    @Param('id') id: string,
+  ) {
+    return this.dietService
+      .delete(user.userId, id)
+      .then((data) => successResponse(data, 'Diet plan deleted'));
   }
 }

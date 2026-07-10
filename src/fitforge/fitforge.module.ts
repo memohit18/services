@@ -6,6 +6,8 @@ import { FoodPreferencesModule } from './onboarding/food-preferences/food-prefer
 import { FoodsModule } from './onboarding/foods/foods.module';
 import { NutritionPreferencesModule } from './onboarding/nutrition-preferences/nutrition-preferences.module';
 import { TransformationModule } from './planning/transformation/transformation.module';
+import { DietModule } from './planning/diet/diet.module';
+import { MealPlansModule } from './planning/meal-plans/meal-plans.module';
 
 @Module({
   imports: [
@@ -16,6 +18,8 @@ import { TransformationModule } from './planning/transformation/transformation.m
     FoodsModule,
     NutritionPreferencesModule,
     TransformationModule,
+    DietModule,
+    MealPlansModule,
   ],
 })
 export class FitforgeModule {}
