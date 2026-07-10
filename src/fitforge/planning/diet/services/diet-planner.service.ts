@@ -68,6 +68,11 @@ export class DietPlannerService {
         }),
         this.prisma.dailyCheckin.findUnique({
           where: { userId_checkInDate: { userId, checkInDate: date } },
+          select: {
+            caloriesConsumed: true,
+            proteinConsumed: true,
+            waterIntakeMl: true,
+          },
         }),
         this.prisma.workoutPlan
           .findFirst({
