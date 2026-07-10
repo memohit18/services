@@ -150,13 +150,30 @@ export class WorkoutsService {
       return cached;
     }
 
-    const plan = await this.prisma.workoutPlan.findFirst({
+    let plan = await this.prisma.workoutPlan.findFirst({
       where: { userId, status: 'active' },
       orderBy: { version: 'desc' },
       include: workoutPlanInclude,
     });
+
+    // Heal: AI generate used to leave plans as draft — activate latest usable draft.
     if (!plan) {
-      throw new NotFoundException('No active workout plan');
+      const draft = await this.prisma.workoutPlan.findFirst({
+        where: {
+          userId,
+          status: 'draft',
+          days: { some: {} },
+        },
+        orderBy: { version: 'desc' },
+        select: { id: true },
+      });
+      if (draft) {
+        plan = await this.activate(userId, draft.id);
+      }
+    }
+
+    if (!plan) {
+      return null;
     }
 
     await this.redis.set(cacheKey, plan, FitForgeCacheTTL.ACTIVE_PLAN);

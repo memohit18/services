@@ -256,7 +256,16 @@
           "request": {
             "method": "GET",
             "url": "{{baseUrl}}/fitness/profile",
-            "description": "404 = new user"
+            "description": "404 = new user; includes plans summary when onboarding completed"
+          },
+          "response": []
+        },
+        {
+          "name": "GET /fitness/plans",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/fitness/plans",
+            "description": "Plan-ready cards: nutrition.dailyTarget/proteinGoal + workout.frequency/focusArea"
           },
           "response": []
         },
@@ -266,7 +275,7 @@
             "method": "POST",
             "header": [{ "key": "Content-Type", "value": "application/json" }],
             "url": "{{baseUrl}}/fitness/profile",
-            "description": "onboardingCompleted:true auto-generates transformation",
+            "description": "onboardingCompleted:true generates transformation (+ async diet/workout) and returns plans",
             "body": {
               "mode": "raw",
               "raw": "{\n  \"age\": 28,\n  \"gender\": \"male\",\n  \"heightCm\": 180,\n  \"weightKg\": 85,\n  \"activityLevel\": \"moderate\",\n  \"fitnessGoal\": \"fat_loss\",\n  \"physiqueGoalId\": \"lean\",\n  \"dietType\": \"high_protein\",\n  \"workoutExperience\": \"intermediate\",\n  \"workoutDaysPerWeek\": 4,\n  \"targetWeightKg\": 75,\n  \"targetBodyFatPercent\": 12,\n  \"allergies\": \"None\",\n  \"onboardingCompleted\": true\n}"

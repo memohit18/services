@@ -17,6 +17,7 @@ import { WorkoutsService } from './services/workouts.service';
   providers: [WorkoutsService],
   exports: [
     WorkoutsService,
+    AiGenerationModule,
     WorkoutSessionModule,
     WorkoutExecutionModule,
     WorkoutAnalyticsModule,

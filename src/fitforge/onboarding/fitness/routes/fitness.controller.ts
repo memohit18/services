@@ -49,6 +49,20 @@ export class FitnessController {
       .then((data) => successResponse(data));
   }
 
+  @Get('plans')
+  @ApiOperation({
+    summary:
+      'Plan-ready summary (nutrition daily target / protein + workout frequency / focus)',
+  })
+  @ApiResponse({ status: 200 })
+  @ApiResponse({ status: 401, description: 'Unauthorized' })
+  @ApiResponse({ status: 404, description: 'Profile not found' })
+  getPlans(@CurrentUser() user: CurrentUserPayload) {
+    return this.fitnessApiService
+      .getPlans(user.userId)
+      .then((data) => successResponse(data));
+  }
+
   @Post('profile')
   @HttpCode(HttpStatus.CREATED)
   @ApiOperation({ summary: 'Create fitness profile (first-time onboarding)' })

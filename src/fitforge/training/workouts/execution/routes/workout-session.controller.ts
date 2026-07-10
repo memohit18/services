@@ -14,14 +14,6 @@ import { WorkoutSessionService } from '../services/workout-session.service';
 export class WorkoutSessionController {
   constructor(private readonly sessions: WorkoutSessionService) {}
 
-  @Get('today')
-  @ApiOperation({ summary: "Today's planned workout day + active session" })
-  today(@CurrentUser() user: CurrentUserPayload) {
-    return this.sessions
-      .getToday(user.userId)
-      .then((data) => successResponse(data));
-  }
-
   @Get('sessions/history')
   @ApiOperation({ summary: 'Completed workout session history' })
   history(

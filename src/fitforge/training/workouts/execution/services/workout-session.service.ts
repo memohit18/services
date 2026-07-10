@@ -4,6 +4,10 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { PrismaService } from '../../../../../prisma/prisma.service';
+import {
+  FitForgeCacheKeys,
+  RedisService,
+} from '../../../../infrastructure/redis/redis.service';
 import { startOfLocalCalendarDay } from '../../../../tracking/checkins/aggregator/daily-aggregator.engine';
 import { DailyAggregatorService } from '../../../../tracking/checkins/services/daily-aggregator.service';
 import { EndWorkoutSessionDto } from '../dto/end-session.dto';
@@ -23,6 +27,7 @@ export class WorkoutSessionService {
     private readonly sessions: WorkoutSessionRepository,
     private readonly analytics: WorkoutAnalyticsService,
     private readonly dailyAggregator: DailyAggregatorService,
+    private readonly redis: RedisService,
   ) {}
 
   async getToday(userId: string) {
@@ -281,7 +286,7 @@ export class WorkoutSessionService {
   }
 
   private async resolveTodayPlanDay(userId: string) {
-    const plan = await this.prisma.workoutPlan.findFirst({
+    let plan = await this.prisma.workoutPlan.findFirst({
       where: { userId, status: 'active' },
       orderBy: { version: 'desc' },
       include: {
@@ -296,6 +301,46 @@ export class WorkoutSessionService {
         },
       },
     });
+
+    if (!plan || plan.days.length === 0) {
+      const draft = await this.prisma.workoutPlan.findFirst({
+        where: {
+          userId,
+          status: 'draft',
+          days: { some: {} },
+        },
+        orderBy: { version: 'desc' },
+        select: { id: true },
+      });
+      if (draft) {
+        await this.prisma.$transaction([
+          this.prisma.workoutPlan.updateMany({
+            where: { userId, status: 'active' },
+            data: { status: 'archived' },
+          }),
+          this.prisma.workoutPlan.update({
+            where: { id: draft.id },
+            data: { status: 'active', startDate: new Date() },
+          }),
+        ]);
+        await this.redis.del(FitForgeCacheKeys.activeWorkout(userId));
+        plan = await this.prisma.workoutPlan.findFirst({
+          where: { id: draft.id },
+          include: {
+            days: {
+              orderBy: { dayNumber: 'asc' },
+              include: {
+                exercises: {
+                  include: { exercise: true },
+                  orderBy: { sortOrder: 'asc' },
+                },
+              },
+            },
+          },
+        });
+      }
+    }
+
     if (!plan || plan.days.length === 0) {
       return null;
     }

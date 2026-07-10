@@ -8,6 +8,12 @@ export type TransformationApiResponse = {
   tdee: number;
   calories: number;
   protein: number;
+  /** Alias for FE plan-ready cards */
+  dailyTarget: number;
+  /** Alias for FE plan-ready cards */
+  proteinGoal: number;
+  dailyCalorieTarget: number;
+  proteinTarget: number;
   estimatedWeeks: number;
   currentWeightKg: number;
   targetWeightKg: number;
@@ -31,13 +37,19 @@ export function toTransformationApi(
   plan: TransformationTarget | TransformationWithMilestones,
   includeMilestones = false,
 ): TransformationApiResponse {
+  const calories = plan.dailyCalorieTarget ?? 0;
+  const protein = plan.proteinTarget ?? 0;
   const response: TransformationApiResponse = {
     id: plan.id,
     bmi: plan.bmi ?? 0,
     bmr: plan.bmr ?? 0,
     tdee: plan.tdee ?? 0,
-    calories: plan.dailyCalorieTarget ?? 0,
-    protein: plan.proteinTarget ?? 0,
+    calories,
+    protein,
+    dailyTarget: calories,
+    proteinGoal: protein,
+    dailyCalorieTarget: calories,
+    proteinTarget: protein,
     estimatedWeeks: plan.estimatedWeeks ?? 0,
     currentWeightKg: plan.currentWeightKg,
     targetWeightKg: plan.targetWeightKg,

@@ -8,11 +8,12 @@ import { CurrentUser } from '../../../../common/decorators/current-user.decorato
 import type { CurrentUserPayload } from '../../../../common/decorators/current-user.decorator';
 import { PaginationQueryDto } from '../../../../common/dto/pagination-query.dto';
 import { successResponse } from '../../../../common/utils/api-response';
+import { AiWorkoutPlanService } from '../../../ai/generation/ai-workout-plan.service';
 import { CreateWorkoutDayDto } from '../dto/create-workout-day.dto';
 import { CreateWorkoutExerciseDto } from '../dto/create-workout-exercise.dto';
 import { CreateWorkoutDto } from '../dto/create-workout.dto';
+import { WorkoutSessionService } from '../execution/services/workout-session.service';
 import { WorkoutsService } from '../services/workouts.service';
-import { AiWorkoutPlanService } from '../../../ai/generation/ai-workout-plan.service';
 
 @ApiTags('Workouts')
 @ApiBearerAuth()
@@ -21,16 +22,18 @@ export class WorkoutsController {
   constructor(
     private readonly workoutsService: WorkoutsService,
     private readonly aiWorkoutPlanService: AiWorkoutPlanService,
+    private readonly workoutSessionService: WorkoutSessionService,
   ) {}
 
   @Post('generate-ai')
   @ApiOperation({
-    summary: 'AI generates workout plan (Gemini JSON) → WorkoutDay + WorkoutExercise',
+    summary:
+      'AI generates workout plan and activates it (days + exercises)',
   })
-  generateAi(@CurrentUser() user: CurrentUserPayload) {
-    return this.aiWorkoutPlanService
-      .generate(user.userId)
-      .then((data) => successResponse(data, 'AI workout plan generated'));
+  async generateAi(@CurrentUser() user: CurrentUserPayload) {
+    const draft = await this.aiWorkoutPlanService.generate(user.userId);
+    const data = await this.workoutsService.activate(user.userId, draft.id);
+    return successResponse(data, 'AI workout plan generated and activated');
   }
 
   @Post()
@@ -44,10 +47,23 @@ export class WorkoutsController {
       .then((data) => successResponse(data, 'Workout plan created'));
   }
 
+  @Get('today')
+  @ApiOperation({
+    summary:
+      "Today's planned workout day + active session (must be before :id)",
+  })
+  today(@CurrentUser() user: CurrentUserPayload) {
+    return this.workoutSessionService
+      .getToday(user.userId)
+      .then((data) => successResponse(data));
+  }
+
   @Get('active')
   @ApiOperation({ summary: 'Get active workout plan with days and exercises' })
   getActive(@CurrentUser() user: CurrentUserPayload) {
-    return this.workoutsService.getActive(user.userId).then((data) => successResponse(data));
+    return this.workoutsService
+      .getActive(user.userId)
+      .then((data) => successResponse(data));
   }
 
   @Get('history')
@@ -65,7 +81,9 @@ export class WorkoutsController {
     @CurrentUser() user: CurrentUserPayload,
     @Param('id') id: string,
   ) {
-    return this.workoutsService.getById(user.userId, id).then((data) => successResponse(data));
+    return this.workoutsService
+      .getById(user.userId, id)
+      .then((data) => successResponse(data));
   }
 
   @Post(':id/days')

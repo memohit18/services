@@ -29,7 +29,8 @@
       "item": [
         { "name": "GET Physique Goals", "request": { "method": "GET", "url": "{{baseUrl}}/fitness/goals" } },
         { "name": "GET Profile", "request": { "method": "GET", "url": "{{baseUrl}}/fitness/profile" } },
-        { "name": "POST Create Profile", "request": { "method": "POST", "header": [{ "key": "Content-Type", "value": "application/json" }], "url": "{{baseUrl}}/fitness/profile", "body": { "mode": "raw", "raw": "{\n  \"age\": 28,\n  \"gender\": \"male\",\n  \"heightCm\": 180,\n  \"weightKg\": 85,\n  \"activityLevel\": \"moderate\",\n  \"fitnessGoal\": \"fat_loss\",\n  \"physiqueGoalId\": \"lean\",\n  \"dietType\": \"high_protein\",\n  \"workoutExperience\": \"intermediate\",\n  \"workoutDaysPerWeek\": 4,\n  \"targetWeightKg\": 75,\n  \"targetBodyFatPercent\": 12,\n  \"allergies\": \"None\",\n  \"onboardingCompleted\": true\n}" } } },
+        { "name": "GET Plans Summary", "request": { "method": "GET", "url": "{{baseUrl}}/fitness/plans", "description": "Nutrition dailyTarget/proteinGoal + workout frequency/focusArea for plan-ready screen" } },
+        { "name": "POST Create Profile", "request": { "method": "POST", "header": [{ "key": "Content-Type", "value": "application/json" }], "url": "{{baseUrl}}/fitness/profile", "body": { "mode": "raw", "raw": "{\n  \"age\": 28,\n  \"gender\": \"male\",\n  \"heightCm\": 180,\n  \"weightKg\": 85,\n  \"activityLevel\": \"moderate\",\n  \"fitnessGoal\": \"fat_loss\",\n  \"physiqueGoalId\": \"lean\",\n  \"dietType\": \"high_protein\",\n  \"workoutExperience\": \"intermediate\",\n  \"workoutDaysPerWeek\": 4,\n  \"targetWeightKg\": 75,\n  \"targetBodyFatPercent\": 12,\n  \"allergies\": \"None\",\n  \"onboardingCompleted\": true\n}" }, "description": "onboardingCompleted:true generates transformation (+ async diet/workout) and returns plans summary" } },
         { "name": "PATCH Update Profile", "request": { "method": "PATCH", "header": [{ "key": "Content-Type", "value": "application/json" }], "url": "{{baseUrl}}/fitness/profile", "body": { "mode": "raw", "raw": "{\n  \"weightKg\": 73,\n  \"fitnessGoal\": \"fat_loss\",\n  \"onboardingCompleted\": true\n}" } } }
       ]
     },
@@ -137,7 +138,8 @@
         { "name": "POST Partial Meal", "request": { "method": "POST", "header": [{ "key": "Content-Type", "value": "application/json" }], "url": "{{baseUrl}}/meals/{{mealItemId}}/partial", "body": { "mode": "raw", "raw": "{\n  \"consumedQuantity\": 0.5\n}" } } },
         { "name": "POST Skip Meal", "request": { "method": "POST", "url": "{{baseUrl}}/meals/{{mealItemId}}/skip" } },
         { "name": "POST Replace Meal", "request": { "method": "POST", "header": [{ "key": "Content-Type", "value": "application/json" }], "url": "{{baseUrl}}/meals/{{mealItemId}}/replace", "body": { "mode": "raw", "raw": "{\n  \"foodId\": \"{{foodId}}\"\n}" } } },
-        { "name": "GET Workout Today", "request": { "method": "GET", "url": "{{baseUrl}}/workouts/today" } },
+        { "name": "POST Generate AI Workout", "request": { "method": "POST", "url": "{{baseUrl}}/workouts/generate-ai", "description": "Generates AI plan and auto-activates it" } },
+        { "name": "GET Workout Today", "request": { "method": "GET", "url": "{{baseUrl}}/workouts/today", "description": "Today's day + exercises (auto-activates latest draft if needed)" } },
         { "name": "GET Active Workout Plan", "request": { "method": "GET", "url": "{{baseUrl}}/workouts/active" } },
         { "name": "GET Active Workout Session", "request": { "method": "GET", "url": "{{baseUrl}}/workouts/session/active" } },
         { "name": "POST Start Workout Session", "request": { "method": "POST", "header": [{ "key": "Content-Type", "value": "application/json" }], "url": "{{baseUrl}}/workouts/session/start", "body": { "mode": "raw", "raw": "{\n  \"workoutPlanDayId\": \"{{workoutPlanDayId}}\"\n}" } } },
