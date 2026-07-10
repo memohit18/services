@@ -1,128 +1,127 @@
-import {
-  BadRequestException,
-  Injectable,
-  NotFoundException,
-} from '@nestjs/common';
+import { Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../../../prisma/prisma.service';
-import { GeminiService } from '../gemini/gemini.service';
+import {
+  AiGenerationPipeline,
+  buildWorkoutPlanPrompt,
+  normalizeWorkoutPlan,
+  validateWorkoutPlanResponse,
+  type NormalizedWorkoutPlan,
+} from '../pipeline';
 import { AiContextService } from '../shared/ai-context.service';
 
-type AiWorkoutExercise = {
-  name: string;
-  sets: number;
-  reps: string;
-  restSeconds: number;
-};
-
-type AiWorkoutDay = {
-  dayNumber: number;
-  title: string;
-  exercises: AiWorkoutExercise[];
-};
-
-type AiWorkoutPlanResponse = {
-  goal?: string;
-  daysPerWeek?: number;
-  days: AiWorkoutDay[];
+type WorkoutPlanContext = {
+  userId: string;
+  profile: NonNullable<
+    Awaited<ReturnType<AiContextService['buildCoachContext']>>['profile']
+  >;
+  daysPerWeek: number;
+  exerciseNames: string[];
+  prompt: string;
 };
 
 @Injectable()
 export class AiWorkoutPlanService {
   constructor(
     private readonly prisma: PrismaService,
-    private readonly gemini: GeminiService,
     private readonly contextService: AiContextService,
+    private readonly pipeline: AiGenerationPipeline,
   ) {}
 
   async generate(userId: string) {
-    const ctx = await this.contextService.buildCoachContext(userId);
-    if (!ctx.profile) {
-      throw new NotFoundException('Fitness profile required');
-    }
+    const { data } = await this.pipeline.runJson<
+      WorkoutPlanContext,
+      ReturnType<typeof validateWorkoutPlanResponse>,
+      NormalizedWorkoutPlan,
+      Awaited<ReturnType<PrismaService['workoutPlan']['create']>>
+    >({
+      collectContext: async () => {
+        const ctx = await this.contextService.buildCoachContext(userId);
+        if (!ctx.profile) {
+          throw new NotFoundException('Fitness profile required');
+        }
 
-    const profile = ctx.profile;
-    const daysPerWeek = profile.workoutDaysPerWeek ?? 5;
-
-    const catalog = await this.prisma.exerciseMaster.findMany({
-      take: 80,
-      orderBy: { name: 'asc' },
-      select: { name: true, muscleGroup: true },
-    });
-
-    const prompt = `Generate a ${daysPerWeek}-day workout plan. Return JSON only.
-
-User:
-Goal: ${profile.fitnessGoal}
-Experience: ${profile.experienceLevel ?? 'beginner'}
-Workout mode: ${profile.workoutMode ?? 'gym'}
-Days per week: ${daysPerWeek}
-
-Available exercises (prefer these names):
-${catalog.map((e) => e.name).join(', ')}
-
-Return format:
-{
-  "goal": "${profile.fitnessGoal}",
-  "daysPerWeek": ${daysPerWeek},
-  "days": [
-    {
-      "dayNumber": 1,
-      "title": "Push Day",
-      "exercises": [
-        { "name": "Bench Press", "sets": 4, "reps": "8-12", "restSeconds": 90 }
-      ]
-    }
-  ]
-}`;
-
-    const aiPlan = await this.gemini.generateJson<AiWorkoutPlanResponse>(prompt);
-    if (!aiPlan.days?.length) {
-      throw new BadRequestException('AI returned no workout days');
-    }
-
-    const latest = await this.prisma.workoutPlan.findFirst({
-      where: { userId },
-      orderBy: { version: 'desc' },
-    });
-    const version = (latest?.version ?? 0) + 1;
-
-    const dayCreates = [];
-    for (const day of aiPlan.days) {
-      const exerciseCreates = [];
-      for (const ex of day.exercises ?? []) {
-        const exercise = await this.resolveExercise(ex.name);
-        exerciseCreates.push({
-          exerciseId: exercise.id,
-          sets: ex.sets,
-          reps: String(ex.reps),
-          restSeconds: ex.restSeconds,
+        const profile = ctx.profile;
+        const daysPerWeek = profile.workoutDaysPerWeek ?? 5;
+        const catalog = await this.prisma.exerciseMaster.findMany({
+          take: 80,
+          orderBy: { name: 'asc' },
+          select: { name: true, muscleGroup: true },
         });
-      }
-      dayCreates.push({
-        dayNumber: day.dayNumber,
-        title: day.title,
-        exercises: exerciseCreates.length ? { create: exerciseCreates } : undefined,
-      });
-    }
+        const exerciseNames = catalog.map((e) => e.name);
+        const prompt = buildWorkoutPlanPrompt({
+          daysPerWeek,
+          fitnessGoal: profile.fitnessGoal,
+          experienceLevel: profile.experienceLevel ?? 'beginner',
+          workoutMode: profile.workoutMode ?? 'gym',
+          exerciseNames,
+        });
 
-    return this.prisma.workoutPlan.create({
-      data: {
-        userId,
-        version,
-        status: 'draft',
-        goal: aiPlan.goal ?? profile.fitnessGoal,
-        daysPerWeek: aiPlan.daysPerWeek ?? daysPerWeek,
-        generatedBy: 'ai',
-        aiPrompt: prompt,
-        days: { create: dayCreates },
+        return {
+          userId,
+          profile,
+          daysPerWeek,
+          exerciseNames,
+          prompt,
+        };
       },
-      include: {
-        days: {
-          orderBy: { dayNumber: 'asc' },
-          include: { exercises: { include: { exercise: true } } },
-        },
+      buildPrompt: (context) => context.prompt,
+      validate: validateWorkoutPlanResponse,
+      normalize: (raw, context) =>
+        normalizeWorkoutPlan(
+          raw,
+          context.daysPerWeek,
+          context.profile.fitnessGoal,
+        ),
+      save: async (normalized, context) => {
+        const latest = await this.prisma.workoutPlan.findFirst({
+          where: { userId: context.userId },
+          orderBy: { version: 'desc' },
+        });
+        const version = (latest?.version ?? 0) + 1;
+
+        const dayCreates = [];
+        for (const day of normalized.days) {
+          const exerciseCreates = [];
+          for (const ex of day.exercises) {
+            const exercise = await this.resolveExercise(ex.name);
+            exerciseCreates.push({
+              exerciseId: exercise.id,
+              sets: ex.sets,
+              reps: ex.reps,
+              restSeconds: ex.restSeconds,
+            });
+          }
+          dayCreates.push({
+            dayNumber: day.dayNumber,
+            title: day.title,
+            exercises: exerciseCreates.length
+              ? { create: exerciseCreates }
+              : undefined,
+          });
+        }
+
+        return this.prisma.workoutPlan.create({
+          data: {
+            userId: context.userId,
+            version,
+            status: 'draft',
+            goal: normalized.goal ?? context.profile.fitnessGoal,
+            daysPerWeek: normalized.daysPerWeek,
+            generatedBy: 'ai',
+            aiPrompt: context.prompt,
+            days: { create: dayCreates },
+          },
+          include: {
+            days: {
+              orderBy: { dayNumber: 'asc' },
+              include: { exercises: { include: { exercise: true } } },
+            },
+          },
+        });
       },
     });
+
+    return data;
   }
 
   private async resolveExercise(name: string) {
