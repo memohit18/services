@@ -3,7 +3,7 @@ import { IsOptional, IsUUID } from 'class-validator';
 
 export class StartWorkoutSessionDto {
   @ApiPropertyOptional({
-    description: 'Optional WorkoutDay id for the planned session',
+    description: 'WorkoutDay id. If omitted, resolves today from active plan.',
   })
   @IsOptional()
   @IsUUID()
