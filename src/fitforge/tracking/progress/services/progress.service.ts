@@ -104,10 +104,7 @@ export class ProgressService {
 
   async getLatest(userId: string) {
     const log = await this.progressRepository.findLatest(userId);
-    if (!log) {
-      throw new NotFoundException('No progress logs yet');
-    }
-    return toProgressLogResponse(log);
+    return log ? toProgressLogResponse(log) : null;
   }
 
   async getHistory(userId: string, query: ProgressHistoryQueryDto) {

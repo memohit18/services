@@ -52,7 +52,9 @@ export class ProgressController {
   }
 
   @Get('latest')
-  @ApiOperation({ summary: 'Get latest progress entry' })
+  @ApiOperation({
+    summary: 'Get latest progress entry (data is null when none logged yet)',
+  })
   @ApiResponse({ status: 200, type: ProgressLogResponseDto })
   getLatest(@CurrentUser() user: CurrentUserPayload) {
     return this.progressService
