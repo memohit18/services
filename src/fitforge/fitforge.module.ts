@@ -11,6 +11,7 @@ import { MealPlansModule } from './planning/meal-plans/meal-plans.module';
 import { CheckinsModule } from './tracking/checkins/checkins.module';
 import { ProgressModule } from './tracking/progress/progress.module';
 import { UploadsModule } from './media/uploads/uploads.module';
+import { GroceryModule } from './planning/grocery/grocery.module';
 
 @Module({
   imports: [
@@ -23,6 +24,7 @@ import { UploadsModule } from './media/uploads/uploads.module';
     TransformationModule,
     DietModule,
     MealPlansModule,
+    GroceryModule,
     CheckinsModule,
     ProgressModule,
     UploadsModule,

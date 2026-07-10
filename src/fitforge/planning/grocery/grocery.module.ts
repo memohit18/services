@@ -7,5 +7,6 @@ import { GroceryService } from './services/grocery.service';
   imports: [MealPlansModule],
   controllers: [GroceryController],
   providers: [GroceryService],
+  exports: [GroceryService],
 })
 export class GroceryModule {}

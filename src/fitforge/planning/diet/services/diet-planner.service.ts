@@ -3,6 +3,10 @@ import type { DailyCheckin, DietPlan, FoodMaster, MealPlanItem } from '@prisma/c
 import { MEAL_TYPES } from '../../../../../db-schema/postgres/constants/fitforge-values';
 import { PrismaService } from '../../../../prisma/prisma.service';
 import { HydrationService } from '../../../tracking/checkins/services/hydration.service';
+import {
+  GroceryService,
+  resolveFoodImageUrl,
+} from '../../grocery/services/grocery.service';
 import { MealPlansService } from '../../meal-plans/services/meal-plans.service';
 import { DietService } from './diet.service';
 
@@ -41,6 +45,9 @@ const GOAL_STATUS_MESSAGES: Record<string, string> = {
 const HYDRATION_TARGET_ML = 4000;
 const FIBER_TARGET_G = 30;
 
+/** Categories used when looking for carb-side swaps (FoodMaster.category values). */
+const SWAP_CARB_CATEGORIES = ['grain', 'vegetable', 'legume', 'staple', 'fruit'];
+
 type MealItemWithFood = MealPlanItem & { food: FoodMaster };
 
 @Injectable()
@@ -50,6 +57,7 @@ export class DietPlannerService {
     private readonly dietService: DietService,
     private readonly mealPlansService: MealPlansService,
     private readonly hydrationService: HydrationService,
+    private readonly groceryService: GroceryService,
   ) {}
 
   async getDashboard(userId: string, dateInput?: string) {
@@ -114,7 +122,11 @@ export class DietPlannerService {
     const caloriesTarget = dietPlan.caloriesTarget ?? 0;
     const proteinTarget = dietPlan.proteinTarget ?? 0;
 
-    const swapSuggestion = await this.buildSwapSuggestion(userId, meals, profile?.dietType);
+    const [swapSuggestion, groceryList] = await Promise.all([
+      this.buildSwapSuggestion(meals, profile?.dietType),
+      this.groceryService.getForPlanner(userId, mealPlan?.id ?? null),
+    ]);
+
     const coachInsight = buildCoachInsight({
       meals,
       proteinTarget,
@@ -168,6 +180,7 @@ export class DietPlannerService {
       vitals: buildVitals(consumedFromMeals, meals),
       coachInsight,
       swapSuggestion,
+      groceryList,
       transformation: transformation
         ? {
             id: transformation.id,
@@ -181,6 +194,8 @@ export class DietPlannerService {
         editPlanUrl: `/diet/${dietPlan.id}`,
         checkinUrl: '/checkins',
         logMealUrl: '/meal-logs',
+        groceryUrl: '/grocery/current',
+        generateGroceryUrl: '/grocery/generate',
       },
     };
   }
@@ -203,53 +218,110 @@ export class DietPlannerService {
   }
 
   private async buildSwapSuggestion(
-    userId: string,
     meals: ReturnType<typeof buildMealSlots>,
     dietType?: string | null,
   ) {
     const pendingItem = meals
-      .filter((m) => m.status === 'pending')
-      .flatMap((m) => m.items)
+      .filter((m) => m.status === 'pending' || m.status === 'partial')
+      .flatMap((m) => m.items.filter((i) => i.logStatus === 'pending'))
       .sort((a, b) => b.carbs - a.carbs)[0];
 
     if (!pendingItem) {
       return null;
     }
 
-    const alternatives = await this.prisma.foodMaster.findMany({
+    const dietFilter = dietType
+      ? { OR: [{ dietType }, { dietType: null }] }
+      : {};
+
+    let alternatives = await this.prisma.foodMaster.findMany({
       where: {
         id: { not: pendingItem.foodId },
-        ...(dietType ? { dietType } : {}),
-        category: { in: ['carb', 'vegetable', 'grain'] },
-        carbs: { lte: pendingItem.carbs },
+        isVerified: true,
+        ...dietFilter,
+        category: { in: SWAP_CARB_CATEGORIES },
+        carbs: { lte: Math.max(pendingItem.carbs, 1) },
       },
-      orderBy: { carbs: 'desc' },
-      take: 5,
+      orderBy: [{ protein: 'desc' }, { carbs: 'asc' }],
+      take: 12,
     });
 
-    const suggestion = alternatives.find(
-      (food) => food.carbs < pendingItem.carbs && food.protein >= pendingItem.protein * 0.8,
-    ) ?? alternatives[0];
+    if (alternatives.length === 0) {
+      alternatives = await this.prisma.foodMaster.findMany({
+        where: {
+          id: { not: pendingItem.foodId },
+          isVerified: true,
+          ...dietFilter,
+          calories: {
+            gte: Math.round(pendingItem.calories * 0.7),
+            lte: Math.round(pendingItem.calories * 1.3),
+          },
+        },
+        orderBy: { protein: 'desc' },
+        take: 12,
+      });
+    }
+
+    if (alternatives.length === 0) {
+      alternatives = await this.prisma.foodMaster.findMany({
+        where: {
+          id: { not: pendingItem.foodId },
+          isVerified: true,
+          category: { in: [...SWAP_CARB_CATEGORIES, 'protein', 'dairy'] },
+        },
+        orderBy: { protein: 'desc' },
+        take: 8,
+      });
+    }
+
+    const suggestion =
+      alternatives.find(
+        (food) =>
+          food.carbs <= pendingItem.carbs &&
+          food.protein >= pendingItem.protein * 0.75,
+      ) ??
+      alternatives.find((food) => food.id !== pendingItem.foodId) ??
+      null;
 
     if (!suggestion) {
       return null;
     }
 
+    const carbDelta = round1(suggestion.carbs - pendingItem.carbs);
+    const proteinDelta = round1(suggestion.protein - pendingItem.protein);
+
     return {
       mealPlanItemId: pendingItem.id,
+      mealType: pendingItem.mealType,
       current: {
         foodId: pendingItem.foodId,
         name: pendingItem.foodName,
         quantity: pendingItem.quantity,
         carbs: pendingItem.carbs,
+        protein: pendingItem.protein,
+        calories: pendingItem.calories,
+        imageUrl: pendingItem.imageUrl,
         label: `${pendingItem.foodName} ${Math.round(pendingItem.carbs)}g C`,
       },
       suggested: {
         foodId: suggestion.id,
         name: suggestion.name,
         carbs: suggestion.carbs,
-        label: `${suggestion.name} ${Math.round(suggestion.carbs)}g C (+ Fiber)`,
-        reason: 'Lower glycemic load with similar protein',
+        protein: suggestion.protein,
+        calories: suggestion.calories,
+        imageUrl: resolveFoodImageUrl(suggestion),
+        label: `${suggestion.name} ${Math.round(suggestion.carbs)}g C`,
+        reason:
+          carbDelta < 0
+            ? 'Lower glycemic load with solid protein'
+            : proteinDelta > 0
+              ? 'Higher protein at a similar calorie cost'
+              : 'Closer macro fit for your remaining targets',
+        deltas: {
+          carbs: carbDelta,
+          protein: proteinDelta,
+          calories: suggestion.calories - pendingItem.calories,
+        },
       },
     };
   }
@@ -262,7 +334,9 @@ function buildMealSlots(
 ) {
   return MEAL_TYPES.map((mealType) => {
     const slotItems = items.filter((item) => item.mealType === mealType);
-    const itemStatuses = slotItems.map((item) => logsByItemId.get(item.id)?.status ?? 'pending');
+    const itemStatuses = slotItems.map(
+      (item) => logsByItemId.get(item.id)?.status ?? 'pending',
+    );
     const status = resolveSlotStatus(itemStatuses);
     const macros = slotItems.reduce(
       (acc, item) => ({
@@ -274,19 +348,33 @@ function buildMealSlots(
       { calories: 0, protein: 0, carbs: 0, fats: 0 },
     );
 
-    const description =
-      slotItems.length > 0
-        ? slotItems.map((item) => formatFoodLine(item)).join(' · ')
-        : 'No meal planned';
+    const mappedItems = slotItems.map((item) => ({
+      id: item.id,
+      mealType,
+      foodId: item.foodId,
+      foodName: item.food.name,
+      quantity: item.quantity,
+      calories: item.calories,
+      protein: item.protein,
+      carbs: item.carbs,
+      fats: item.fats,
+      imageUrl: resolveFoodImageUrl(item.food),
+      category: item.food.category ?? null,
+      logStatus: logsByItemId.get(item.id)?.status ?? 'pending',
+    }));
 
-    const isCritical = mealType === 'snack' && hasWorkoutPlan;
+    const description =
+      mappedItems.length > 0
+        ? mappedItems.map((item) => formatFoodLine(item)).join(' · ')
+        : 'No meal planned';
 
     return {
       mealType,
       displayName: MEAL_DISPLAY_NAMES[mealType] ?? mealType.toUpperCase(),
       scheduledTime: MEAL_SCHEDULE[mealType] ?? null,
-      tag: isCritical ? 'CRITICAL' : null,
+      tag: resolveMealTag(mealType, macros, hasWorkoutPlan),
       description,
+      imageUrl: mappedItems[0]?.imageUrl ?? null,
       macros: {
         calories: Math.round(macros.calories),
         protein: round1(macros.protein),
@@ -294,27 +382,44 @@ function buildMealSlots(
         fats: round1(macros.fats),
       },
       status,
-      items: slotItems.map((item) => ({
-        id: item.id,
-        foodId: item.foodId,
-        foodName: item.food.name,
-        quantity: item.quantity,
-        calories: item.calories,
-        protein: item.protein,
-        carbs: item.carbs,
-        fats: item.fats,
-        logStatus: logsByItemId.get(item.id)?.status ?? 'pending',
-      })),
-      canSwap: status === 'pending' && slotItems.length > 0,
-      canEdit: slotItems.length > 0,
+      items: mappedItems,
+      canSwap: status === 'pending' && mappedItems.length > 0,
+      canEdit: mappedItems.length > 0,
     };
   }).filter((slot) => slot.items.length > 0 || slot.mealType === 'breakfast');
 }
 
-function formatFoodLine(item: MealItemWithFood) {
-  const qty =
-    item.quantity === 1 ? item.food.name : `${item.quantity}× ${item.food.name}`;
-  return qty;
+function resolveMealTag(
+  mealType: string,
+  macros: { calories: number; protein: number; carbs: number; fats: number },
+  hasWorkoutPlan: boolean,
+): string {
+  // Post-workout snack is always the critical recovery window in the UI.
+  if (mealType === 'snack') {
+    return hasWorkoutPlan ? 'CRITICAL' : 'RECOVERY';
+  }
+
+  const proteinCals =
+    macros.calories > 0 ? (macros.protein * 4) / macros.calories : 0;
+  if (proteinCals >= 0.3 || macros.protein >= 35) {
+    return 'HIGH PROTEIN';
+  }
+  if (macros.carbs >= 55) {
+    return 'ENERGY';
+  }
+  if (mealType === 'breakfast') {
+    return 'FOUNDATION';
+  }
+  if (macros.fats >= 25 && macros.protein < 25) {
+    return 'SATIETY';
+  }
+  return 'BALANCED';
+}
+
+function formatFoodLine(item: { quantity: number; foodName: string }) {
+  return item.quantity === 1
+    ? item.foodName
+    : `${item.quantity}× ${item.foodName}`;
 }
 
 function resolveSlotStatus(statuses: string[]) {
@@ -417,7 +522,8 @@ function buildCoachInsight(input: {
 
   return {
     status: 'ON_TRACK',
-    message: 'Great work today — all planned meals are logged. Recovery and hydration are key for tomorrow.',
+    message:
+      'Great work today — all planned meals are logged. Recovery and hydration are key for tomorrow.',
     actionable: false,
     suggestedAction: null,
   };
@@ -444,7 +550,10 @@ function resolveDayNumber(
   mealPlan: { startDate: Date | string | null; items: MealPlanItem[] },
   date: Date,
 ) {
-  const maxDay = mealPlan.items.reduce((max, item) => Math.max(max, item.dayNumber), 7);
+  const maxDay = mealPlan.items.reduce(
+    (max, item) => Math.max(max, item.dayNumber),
+    7,
+  );
   if (mealPlan.startDate) {
     const start = startOfLocalDay(mealPlan.startDate);
     const diffDays = Math.floor((date.getTime() - start.getTime()) / 86_400_000);
