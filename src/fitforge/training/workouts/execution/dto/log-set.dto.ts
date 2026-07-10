@@ -1,5 +1,5 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { Type } from 'class-transformer';
+import { Transform, Type } from 'class-transformer';
 import {
   IsInt,
   IsNumber,
@@ -10,6 +10,14 @@ import {
   Min,
 } from 'class-validator';
 
+/** FE may send reps as number (10) or string ("8-12" / "10"). */
+function toRepsString(value: unknown): string | undefined {
+  if (value === undefined || value === null) {
+    return undefined;
+  }
+  return String(value);
+}
+
 export class LogWorkoutSetDto {
   @ApiPropertyOptional({
     description: 'Active session id (defaults to current open session)',
@@ -18,7 +26,11 @@ export class LogWorkoutSetDto {
   @IsUUID()
   sessionId?: string;
 
-  @ApiProperty({ example: 10, description: 'Reps completed for this set' })
+  @ApiProperty({
+    example: '10',
+    description: 'Reps completed for this set (number or string)',
+  })
+  @Transform(({ value }) => toRepsString(value))
   @IsString()
   @MaxLength(32)
   reps!: string;

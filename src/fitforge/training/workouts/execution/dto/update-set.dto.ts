@@ -1,5 +1,5 @@
 import { ApiPropertyOptional } from '@nestjs/swagger';
-import { Type } from 'class-transformer';
+import { Transform, Type } from 'class-transformer';
 import {
   IsInt,
   IsNumber,
@@ -9,9 +9,20 @@ import {
   Min,
 } from 'class-validator';
 
+function toRepsString(value: unknown): string | undefined {
+  if (value === undefined || value === null) {
+    return undefined;
+  }
+  return String(value);
+}
+
 export class UpdateWorkoutSetDto {
-  @ApiPropertyOptional({ example: '12' })
+  @ApiPropertyOptional({
+    example: '12',
+    description: 'Reps (number or string)',
+  })
   @IsOptional()
+  @Transform(({ value }) => toRepsString(value))
   @IsString()
   @MaxLength(32)
   reps?: string;
