@@ -14,14 +14,67 @@ import {
 } from '../../../infrastructure/redis/redis.service';
 import { CreateMealPlanItemDto } from '../dto/create-meal-plan-item.dto';
 import { CreateMealPlanDto } from '../dto/create-meal-plan.dto';
+import { GenerateMealPlanDto } from '../dto/generate-meal-plan.dto';
 import { UpdateMealPlanItemDto } from '../dto/update-meal-plan-item.dto';
+import { MealItemRepository } from '../repositories/meal-item.repository';
+import { MealPlanRepository } from '../repositories/meal-plan.repository';
+import { MealGeneratorService } from './meal-generator.service';
+import { MealPlanNormalizer } from './meal-plan-normalizer.service';
 
 @Injectable()
 export class MealPlansService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly redis: RedisService,
+    private readonly mealPlanRepository: MealPlanRepository,
+    private readonly mealItemRepository: MealItemRepository,
+    private readonly mealPlanNormalizer: MealPlanNormalizer,
+    private readonly mealGeneratorService: MealGeneratorService,
   ) {}
+
+  /**
+   * Phase 5: generate from active (or specified) diet.
+   * Prefers AI responseJson normalizer; falls back to rule-based FoodMaster picker.
+   */
+  async generateFromDiet(userId: string, dto: GenerateMealPlanDto) {
+    const planType = dto.planType ?? 'weekly';
+    const dietPlan = dto.dietPlanId
+      ? await this.prisma.dietPlan.findFirst({
+          where: { id: dto.dietPlanId, userId },
+        })
+      : await this.prisma.dietPlan.findFirst({
+          where: { userId, status: 'active' },
+          orderBy: { version: 'desc' },
+        });
+
+    if (!dietPlan) {
+      throw new NotFoundException(
+        dto.dietPlanId
+          ? 'Diet plan not found'
+          : 'No active diet plan. Generate a diet first.',
+      );
+    }
+
+    let plan;
+    if (dietPlan.responseJson) {
+      plan = await this.mealPlanNormalizer.materializeFromDietPlan({
+        userId,
+        dietPlanId: dietPlan.id,
+        planType,
+      });
+    } else {
+      // Legacy diets without AI JSON — rule-based generation (draft then activate)
+      const draft = await this.mealGeneratorService.generate(userId, {
+        dietPlanId: dietPlan.id,
+        planType,
+        days: dto.days,
+      });
+      plan = await this.activate(userId, draft.id);
+    }
+
+    await this.redis.del(FitForgeCacheKeys.activeMealPlan(userId));
+    return plan;
+  }
 
   async create(userId: string, dto: CreateMealPlanDto) {
     const dietPlan = await this.prisma.dietPlan.findFirst({
@@ -31,22 +84,20 @@ export class MealPlansService {
       throw new NotFoundException('Diet plan not found');
     }
 
-    const latest = await this.prisma.mealPlan.findFirst({
-      where: { userId, planType: dto.planType },
-      orderBy: { version: 'desc' },
-    });
+    const latest = await this.mealPlanRepository.latestVersion(
+      userId,
+      dto.planType,
+    );
     const version = (latest?.version ?? 0) + 1;
 
-    return this.prisma.mealPlan.create({
-      data: {
-        userId,
-        dietPlanId: dto.dietPlanId,
-        version,
-        planType: dto.planType,
-        status: 'draft',
-        startDate: dto.startDate ? new Date(dto.startDate) : undefined,
-        endDate: dto.endDate ? new Date(dto.endDate) : undefined,
-      },
+    return this.mealPlanRepository.createDraft({
+      user: { connect: { id: userId } },
+      dietPlan: { connect: { id: dto.dietPlanId } },
+      version,
+      planType: dto.planType,
+      status: 'draft',
+      startDate: dto.startDate ? new Date(dto.startDate) : undefined,
+      endDate: dto.endDate ? new Date(dto.endDate) : undefined,
     });
   }
 
@@ -59,11 +110,7 @@ export class MealPlansService {
       return cached;
     }
 
-    const plan = await this.prisma.mealPlan.findFirst({
-      where: { userId, status: 'active' },
-      orderBy: { version: 'desc' },
-      include: { items: { include: { food: true }, orderBy: [{ dayNumber: 'asc' }, { mealType: 'asc' }] } },
-    });
+    const plan = await this.mealPlanRepository.findActive(userId);
     if (!plan) {
       throw new NotFoundException('No active meal plan');
     }
@@ -72,42 +119,40 @@ export class MealPlansService {
     return plan;
   }
 
+  async getById(userId: string, id: string) {
+    const plan = await this.mealPlanRepository.findById(id, userId);
+    if (!plan) {
+      throw new NotFoundException('Meal plan not found');
+    }
+    return plan;
+  }
+
   async getHistory(userId: string, query: PaginationQueryDto) {
     const { page, limit, skip } = getPagination(query);
-    const where = { userId };
-    const [items, total] = await Promise.all([
-      this.prisma.mealPlan.findMany({
-        where,
-        skip,
-        take: limit,
-        orderBy: { createdAt: 'desc' },
-      }),
-      this.prisma.mealPlan.count({ where }),
-    ]);
+    const [items, total] = await this.mealPlanRepository.findHistory(
+      userId,
+      skip,
+      limit,
+    );
     return paginatedResponse(items, total, page, limit);
   }
 
   async getSchedule(userId: string, id: string) {
-    const plan = await this.prisma.mealPlan.findFirst({
-      where: { id, userId },
-      include: {
-        items: {
-          include: { food: true },
-          orderBy: [{ dayNumber: 'asc' }, { mealType: 'asc' }],
-        },
-      },
-    });
+    const plan = await this.mealPlanRepository.findById(id, userId);
     if (!plan) {
       throw new NotFoundException('Meal plan not found');
     }
 
-    const schedule = plan.items.reduce<Record<number, typeof plan.items>>((acc, item) => {
-      if (!acc[item.dayNumber]) {
-        acc[item.dayNumber] = [];
-      }
-      acc[item.dayNumber].push(item);
-      return acc;
-    }, {});
+    const schedule = plan.items.reduce<Record<number, typeof plan.items>>(
+      (acc, item) => {
+        if (!acc[item.dayNumber]) {
+          acc[item.dayNumber] = [];
+        }
+        acc[item.dayNumber].push(item);
+        return acc;
+      },
+      {},
+    );
 
     return successResponse({ planId: plan.id, schedule }).data;
   }
@@ -116,18 +161,23 @@ export class MealPlansService {
     await this.ensureMealPlan(userId, mealPlanId);
     await this.ensureFood(dto.foodId);
 
-    const item = await this.prisma.mealPlanItem.create({
-      data: { mealPlanId, ...dto },
-      include: { food: true },
+    const item = await this.mealItemRepository.create({
+      mealPlan: { connect: { id: mealPlanId } },
+      food: { connect: { id: dto.foodId } },
+      dayNumber: dto.dayNumber,
+      mealType: dto.mealType,
+      quantity: dto.quantity,
+      calories: dto.calories,
+      protein: dto.protein,
+      carbs: dto.carbs,
+      fats: dto.fats,
     });
     await this.redis.del(FitForgeCacheKeys.activeMealPlan(userId));
     return item;
   }
 
   async updateItem(userId: string, itemId: string, dto: UpdateMealPlanItemDto) {
-    const item = await this.prisma.mealPlanItem.findFirst({
-      where: { id: itemId, mealPlan: { userId } },
-    });
+    const item = await this.mealItemRepository.findByIdForUser(itemId, userId);
     if (!item) {
       throw new NotFoundException('Meal plan item not found');
     }
@@ -135,23 +185,26 @@ export class MealPlansService {
       await this.ensureFood(dto.foodId);
     }
 
-    const updated = await this.prisma.mealPlanItem.update({
-      where: { id: itemId },
-      data: dto,
-      include: { food: true },
+    const updated = await this.mealItemRepository.update(itemId, {
+      ...(dto.foodId ? { food: { connect: { id: dto.foodId } } } : {}),
+      ...(dto.dayNumber !== undefined ? { dayNumber: dto.dayNumber } : {}),
+      ...(dto.mealType !== undefined ? { mealType: dto.mealType } : {}),
+      ...(dto.quantity !== undefined ? { quantity: dto.quantity } : {}),
+      ...(dto.calories !== undefined ? { calories: dto.calories } : {}),
+      ...(dto.protein !== undefined ? { protein: dto.protein } : {}),
+      ...(dto.carbs !== undefined ? { carbs: dto.carbs } : {}),
+      ...(dto.fats !== undefined ? { fats: dto.fats } : {}),
     });
     await this.redis.del(FitForgeCacheKeys.activeMealPlan(userId));
     return updated;
   }
 
   async deleteItem(userId: string, itemId: string) {
-    const item = await this.prisma.mealPlanItem.findFirst({
-      where: { id: itemId, mealPlan: { userId } },
-    });
+    const item = await this.mealItemRepository.findByIdForUser(itemId, userId);
     if (!item) {
       throw new NotFoundException('Meal plan item not found');
     }
-    await this.prisma.mealPlanItem.delete({ where: { id: itemId } });
+    await this.mealItemRepository.delete(itemId);
     await this.redis.del(FitForgeCacheKeys.activeMealPlan(userId));
     return { id: itemId };
   }
@@ -162,22 +215,9 @@ export class MealPlansService {
       throw new NotFoundException('Meal plan not found');
     }
 
-    await this.prisma.$transaction([
-      this.prisma.mealPlan.updateMany({
-        where: { userId, status: 'active' },
-        data: { status: 'archived' },
-      }),
-      this.prisma.mealPlan.update({
-        where: { id },
-        data: { status: 'active', startDate: new Date() },
-      }),
-    ]);
-
+    const activated = await this.mealPlanRepository.activate(userId, id);
     await this.redis.del(FitForgeCacheKeys.activeMealPlan(userId));
-    return this.prisma.mealPlan.findUnique({
-      where: { id },
-      include: { items: { include: { food: true } } },
-    });
+    return activated;
   }
 
   private async ensureMealPlan(userId: string, mealPlanId: string) {

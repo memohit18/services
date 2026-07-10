@@ -1,7 +1,7 @@
 {
   "info": {
     "name": "FitForge API",
-    "description": "# Setup\n1. Set `baseUrl` (default http://localhost:3303)\n2. Set `accessToken` from auth-service\n\nAll routes use Bearer auth unless noted.\n\n# Response envelope\n```json\n{ \"success\": true, \"message\": \"...\", \"data\": {} }\n```\n\n# Phases\n- **01** Fitness Profile (Phase 1)\n- **02** Transformation (Phase 2)\n- **03** Foods, Food Preferences & Nutrition Preferences (Phase 3)\n- **04** AI Diet Planner (Phase 4)",
+    "description": "# Setup\n1. Set `baseUrl` (default http://localhost:3303)\n2. Set `accessToken` from auth-service\n\nAll routes use Bearer auth unless noted.\n\n# Response envelope\n```json\n{ \"success\": true, \"message\": \"...\", \"data\": {} }\n```\n\n# Phases\n- **01** Fitness Profile (Phase 1)\n- **02** Transformation (Phase 2)\n- **03** Foods, Food Preferences & Nutrition Preferences (Phase 3)\n- **04** AI Diet Planner (Phase 4)\n- **05** Meal Planning Engine (Phase 5)",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
   },
   "variable": [
@@ -9,7 +9,9 @@
     { "key": "accessToken", "value": "" },
     { "key": "transformationId", "value": "" },
     { "key": "foodId", "value": "" },
-    { "key": "dietPlanId", "value": "" }
+    { "key": "dietPlanId", "value": "" },
+    { "key": "mealPlanId", "value": "" },
+    { "key": "mealItemId", "value": "" }
   ],
   "auth": {
     "type": "bearer",
@@ -79,6 +81,20 @@
         { "name": "DELETE Diet (Phase 4)", "request": { "method": "DELETE", "url": "{{baseUrl}}/diet/{{dietPlanId}}" } },
         { "name": "GET Diet Planner Dashboard", "request": { "method": "GET", "url": "{{baseUrl}}/diet/planner" } },
         { "name": "PATCH Hydration", "request": { "method": "PATCH", "header": [{ "key": "Content-Type", "value": "application/json" }], "url": "{{baseUrl}}/diet/planner/hydration", "body": { "mode": "raw", "raw": "{\n  \"amountMl\": 250\n}" } } }
+      ]
+    },
+    {
+      "name": "05 — Meal Planning (Phase 5)",
+      "item": [
+        { "name": "POST Generate from active diet", "request": { "method": "POST", "header": [{ "key": "Content-Type", "value": "application/json" }], "url": "{{baseUrl}}/meal-plans/generate", "body": { "mode": "raw", "raw": "{\n  \"planType\": \"weekly\"\n}" } } },
+        { "name": "GET Active Meal Plan", "request": { "method": "GET", "url": "{{baseUrl}}/meal-plans/active" } },
+        { "name": "GET Meal Plan By ID", "request": { "method": "GET", "url": "{{baseUrl}}/meal-plans/{{mealPlanId}}" } },
+        { "name": "GET History", "request": { "method": "GET", "url": "{{baseUrl}}/meal-plans/history?page=1&limit=20" } },
+        { "name": "GET Today", "request": { "method": "GET", "url": "{{baseUrl}}/meal-plans/today" } },
+        { "name": "GET Nutrition Summary", "request": { "method": "GET", "url": "{{baseUrl}}/meal-plans/nutrition-summary" } },
+        { "name": "POST Complete Meal", "request": { "method": "POST", "url": "{{baseUrl}}/meal-plans/{{mealItemId}}/complete" } },
+        { "name": "POST Skip Meal", "request": { "method": "POST", "url": "{{baseUrl}}/meal-plans/{{mealItemId}}/skip" } },
+        { "name": "POST Replace Meal", "request": { "method": "POST", "header": [{ "key": "Content-Type", "value": "application/json" }], "url": "{{baseUrl}}/meal-plans/{{mealItemId}}/replace", "body": { "mode": "raw", "raw": "{\n  \"foodId\": \"{{foodId}}\",\n  \"quantity\": 1\n}" } } }
       ]
     }
   ]

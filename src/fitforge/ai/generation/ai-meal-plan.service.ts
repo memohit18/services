@@ -4,7 +4,6 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { PrismaService } from '../../../prisma/prisma.service';
-import { GenerateMealPlanDto } from '../../planning/meal-plans/dto/generate-meal-plan.dto';
 import {
   AiGenerationPipeline,
   buildMealPlanPrompt,
@@ -41,7 +40,7 @@ export class AiMealPlanService {
     private readonly pipeline: AiGenerationPipeline,
   ) {}
 
-  async generate(userId: string, dto: GenerateMealPlanDto) {
+  async generate(userId: string, dto: { dietPlanId: string; planType: string; days?: number }) {
     const { data } = await this.pipeline.runJson<
       MealPlanContext,
       ReturnType<typeof validateMealPlanResponse>,

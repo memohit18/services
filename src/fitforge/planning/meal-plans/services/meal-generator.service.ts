@@ -14,6 +14,11 @@ export class MealGeneratorService {
   constructor(private readonly prisma: PrismaService) {}
 
   async generate(userId: string, dto: GenerateMealPlanDto) {
+    // Legacy rule-based path still requires dietPlanId
+    if (!dto.dietPlanId) {
+      throw new BadRequestException('dietPlanId is required for rule-based generation');
+    }
+    const planType = dto.planType ?? 'weekly';
     const dietPlan = await this.prisma.dietPlan.findFirst({
       where: { id: dto.dietPlanId, userId },
     });
@@ -72,11 +77,11 @@ export class MealGeneratorService {
     };
     const mealDistribution = dietPlan.mealDistribution as MealDistribution | null;
 
-    const dayCount = dto.days ?? (dto.planType === 'weekly' ? 7 : 30);
+    const dayCount = dto.days ?? (planType === 'weekly' ? 7 : 30);
     const generateDays = Math.min(dayCount, 7);
 
     const latest = await this.prisma.mealPlan.findFirst({
-      where: { userId, planType: dto.planType },
+      where: { userId, planType },
       orderBy: { version: 'desc' },
     });
     const version = (latest?.version ?? 0) + 1;
@@ -92,9 +97,9 @@ export class MealGeneratorService {
     const mealPlan = await this.prisma.mealPlan.create({
       data: {
         userId,
-        dietPlanId: dto.dietPlanId,
+        dietPlanId: dietPlan.id,
         version,
-        planType: dto.planType,
+        planType,
         status: 'draft',
         items: {
           create: allItems,
