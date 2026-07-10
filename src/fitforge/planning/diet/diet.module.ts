@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
 import { AiGenerationModule } from '../../ai/generation/ai-generation.module';
 import { GeminiModule } from '../../ai/gemini/gemini.module';
+import { CheckinsModule } from '../../tracking/checkins/checkins.module';
 import { MealPlansModule } from '../meal-plans/meal-plans.module';
 import { DIET_AI_PROVIDER } from './ai/diet-ai.provider';
 import { DietAiGateway } from './ai/diet-ai.gateway';
@@ -13,7 +14,7 @@ import { DietPlannerService } from './services/diet-planner.service';
 import { DietService } from './services/diet.service';
 
 @Module({
-  imports: [AiGenerationModule, GeminiModule, MealPlansModule],
+  imports: [AiGenerationModule, GeminiModule, MealPlansModule, CheckinsModule],
   controllers: [DietController],
   providers: [
     DietService,

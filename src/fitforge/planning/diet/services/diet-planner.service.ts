@@ -2,6 +2,7 @@ import { Injectable, NotFoundException } from '@nestjs/common';
 import type { DailyCheckin, DietPlan, FoodMaster, MealPlanItem } from '@prisma/client';
 import { MEAL_TYPES } from '../../../../../db-schema/postgres/constants/fitforge-values';
 import { PrismaService } from '../../../../prisma/prisma.service';
+import { HydrationService } from '../../../tracking/checkins/services/hydration.service';
 import { MealPlansService } from '../../meal-plans/services/meal-plans.service';
 import { DietService } from './diet.service';
 
@@ -48,6 +49,7 @@ export class DietPlannerService {
     private readonly prisma: PrismaService,
     private readonly dietService: DietService,
     private readonly mealPlansService: MealPlansService,
+    private readonly hydrationService: HydrationService,
   ) {}
 
   async getDashboard(userId: string, dateInput?: string) {
@@ -179,51 +181,8 @@ export class DietPlannerService {
   }
 
   async addHydration(userId: string, amountMl: number) {
-    const checkInDate = startOfLocalDay(new Date());
-    const existing = await this.prisma.dailyCheckin.findUnique({
-      where: { userId_checkInDate: { userId, checkInDate } },
-    });
-
-    let dietPlanId: string | undefined;
-    let workoutPlanId: string | undefined;
-    try {
-      dietPlanId = (await this.dietService.getActive(userId)).id;
-    } catch {
-      dietPlanId = undefined;
-    }
-    try {
-      workoutPlanId = (
-        await this.prisma.workoutPlan.findFirst({
-          where: { userId, status: 'active' },
-        })
-      )?.id;
-    } catch {
-      workoutPlanId = undefined;
-    }
-
-    if (existing) {
-      const waterIntakeMl = (existing.waterIntakeMl ?? 0) + amountMl;
-      const updated = await this.prisma.dailyCheckin.update({
-        where: { id: existing.id },
-        data: { waterIntakeMl },
-      });
-      return this.formatHydration(updated);
-    }
-
-    const created = await this.prisma.dailyCheckin.create({
-      data: {
-        userId,
-        checkInDate,
-        dietPlanId,
-        workoutPlanId,
-        waterIntakeMl: amountMl,
-        mealsCompleted: 0,
-        mealsSkipped: 0,
-        dietCompliance: 0,
-        workoutCompleted: false,
-      },
-    });
-    return this.formatHydration(created);
+    const { checkin } = await this.hydrationService.log(userId, amountMl);
+    return this.formatHydration(checkin);
   }
 
   private formatHydration(checkin: DailyCheckin) {

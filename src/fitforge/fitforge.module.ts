@@ -8,6 +8,9 @@ import { NutritionPreferencesModule } from './onboarding/nutrition-preferences/n
 import { TransformationModule } from './planning/transformation/transformation.module';
 import { DietModule } from './planning/diet/diet.module';
 import { MealPlansModule } from './planning/meal-plans/meal-plans.module';
+import { CheckinsModule } from './tracking/checkins/checkins.module';
+import { ProgressModule } from './tracking/progress/progress.module';
+import { UploadsModule } from './media/uploads/uploads.module';
 
 @Module({
   imports: [
@@ -20,6 +23,9 @@ import { MealPlansModule } from './planning/meal-plans/meal-plans.module';
     TransformationModule,
     DietModule,
     MealPlansModule,
+    CheckinsModule,
+    ProgressModule,
+    UploadsModule,
   ],
 })
 export class FitforgeModule {}

@@ -10,6 +10,7 @@ import {
   FitForgeCacheKeys,
   RedisService,
 } from '../../../infrastructure/redis/redis.service';
+import { DailyAggregatorService } from '../../../tracking/checkins/services/daily-aggregator.service';
 import { ReplaceMealDto } from '../dto/replace-meal.dto';
 import { MealItemRepository } from '../repositories/meal-item.repository';
 import { MealLogRepository } from '../repositories/meal-log.repository';
@@ -49,6 +50,7 @@ export class MealTrackingService {
     private readonly mealItemRepository: MealItemRepository,
     private readonly mealLogRepository: MealLogRepository,
     private readonly redis: RedisService,
+    private readonly dailyAggregator: DailyAggregatorService,
   ) {}
 
   async getToday(userId: string, dateInput?: string) {
@@ -219,6 +221,7 @@ export class MealTrackingService {
     });
 
     await this.redis.del(FitForgeCacheKeys.activeMealPlan(userId));
+    await this.dailyAggregator.rebuildForDate(userId, dayStart);
     return log;
   }
 
@@ -236,7 +239,7 @@ export class MealTrackingService {
     }
 
     const { dayStart, dayEnd } = this.todayBounds();
-    return this.mealLogRepository.upsertTodayStatus({
+    const log = await this.mealLogRepository.upsertTodayStatus({
       userId,
       mealPlanItemId: mealItemId,
       status,
@@ -246,6 +249,8 @@ export class MealTrackingService {
       dayStart,
       dayEnd,
     });
+    await this.dailyAggregator.rebuildForDate(userId, dayStart);
+    return log;
   }
 
   private assertMacroCompatible(

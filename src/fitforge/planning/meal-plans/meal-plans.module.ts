@@ -1,5 +1,6 @@
 import { Module } from '@nestjs/common';
 import { AiGenerationModule } from '../../ai/generation/ai-generation.module';
+import { CheckinsModule } from '../../tracking/checkins/checkins.module';
 import { MealPlanRepository } from './repositories/meal-plan.repository';
 import { MealItemRepository } from './repositories/meal-item.repository';
 import { MealLogRepository } from './repositories/meal-log.repository';
@@ -10,7 +11,7 @@ import { MealPlansService } from './services/meal-plans.service';
 import { MealTrackingService } from './services/meal-tracking.service';
 
 @Module({
-  imports: [AiGenerationModule],
+  imports: [AiGenerationModule, CheckinsModule],
   controllers: [MealPlansController],
   providers: [
     MealPlansService,

@@ -1,98 +1,104 @@
-import { ConflictException, Injectable } from '@nestjs/common';
+import { Injectable } from '@nestjs/common';
 import { getPagination, PaginationQueryDto } from '../../../../common/dto/pagination-query.dto';
 import { paginatedResponse, successResponse } from '../../../../common/utils/api-response';
-import { DietService } from '../../../planning/diet/services/diet.service';
-import { PrismaService } from '../../../../prisma/prisma.service';
-import { WorkoutsService } from '../../../training/workouts/services/workouts.service';
+import { startOfLocalCalendarDay } from '../aggregator/daily-aggregator.engine';
 import { CreateCheckinDto } from '../dto/create-checkin.dto';
+import { DailyCheckinRepository } from '../repositories/daily-checkin.repository';
+import { DailyAggregatorService } from './daily-aggregator.service';
 
 @Injectable()
 export class CheckinsService {
   constructor(
-    private readonly prisma: PrismaService,
-    private readonly dietService: DietService,
-    private readonly workoutsService: WorkoutsService,
+    private readonly dailyCheckinRepository: DailyCheckinRepository,
+    private readonly dailyAggregator: DailyAggregatorService,
   ) {}
 
+  /**
+   * Rebuild today's DailyCheckin from raw events, then apply optional
+   * legacy field overrides (for older clients that POST absolute values).
+   * Prefer POST /checkins/hydration and /checkins/workout-sessions for new clients.
+   */
   async checkin(userId: string, dto: CreateCheckinDto) {
-    const checkInDate = startOfDay(new Date());
+    let checkin = await this.dailyAggregator.rebuildForDate(
+      userId,
+      startOfLocalCalendarDay(),
+    );
 
-    const existing = await this.prisma.dailyCheckin.findUnique({
-      where: { userId_checkInDate: { userId, checkInDate } },
-    });
-    if (existing) {
-      throw new ConflictException('Check-in already exists for today');
+    const hasLegacyOverrides =
+      dto.weightKg !== undefined ||
+      dto.caloriesConsumed !== undefined ||
+      dto.proteinConsumed !== undefined ||
+      dto.waterIntakeMl !== undefined ||
+      dto.mealsCompleted !== undefined ||
+      dto.mealsSkipped !== undefined ||
+      dto.workoutCompleted !== undefined ||
+      dto.notes !== undefined;
+
+    if (!hasLegacyOverrides) {
+      return checkin;
     }
 
-    let dietPlanId: string | undefined;
-    let workoutPlanId: string | undefined;
-    try {
-      dietPlanId = (await this.dietService.getActive(userId)).id;
-    } catch {
-      dietPlanId = undefined;
-    }
-    try {
-      workoutPlanId = (await this.workoutsService.getActive(userId)).id;
-    } catch {
-      workoutPlanId = undefined;
-    }
-
-    const mealsAssigned = (dto.mealsCompleted ?? 0) + (dto.mealsSkipped ?? 0);
+    const mealsCompleted = dto.mealsCompleted ?? checkin.mealsCompleted;
+    const mealsSkipped = dto.mealsSkipped ?? checkin.mealsSkipped;
+    const mealsAssigned = mealsCompleted + mealsSkipped;
     const dietCompliance =
-      mealsAssigned > 0
-        ? Math.round(((dto.mealsCompleted ?? 0) / mealsAssigned) * 100)
-        : 0;
+      dto.mealsCompleted !== undefined || dto.mealsSkipped !== undefined
+        ? mealsAssigned > 0
+          ? Math.round((mealsCompleted / mealsAssigned) * 100)
+          : 0
+        : checkin.dietCompliance;
 
-    return this.prisma.dailyCheckin.create({
-      data: {
-        userId,
-        checkInDate,
-        dietPlanId,
-        workoutPlanId,
-        weightKg: dto.weightKg,
-        caloriesConsumed: dto.caloriesConsumed,
-        proteinConsumed: dto.proteinConsumed,
-        waterIntakeMl: dto.waterIntakeMl,
-        mealsCompleted: dto.mealsCompleted ?? 0,
-        mealsSkipped: dto.mealsSkipped ?? 0,
-        dietCompliance,
-        workoutCompleted: dto.workoutCompleted ?? false,
-      },
+    return this.dailyCheckinRepository.upsert(userId, checkin.checkInDate, {
+      dietPlanId: checkin.dietPlanId,
+      workoutPlanId: checkin.workoutPlanId,
+      weightKg: dto.weightKg ?? checkin.weightKg,
+      caloriesConsumed: dto.caloriesConsumed ?? checkin.caloriesConsumed,
+      proteinConsumed: dto.proteinConsumed ?? checkin.proteinConsumed,
+      waterIntakeMl: dto.waterIntakeMl ?? checkin.waterIntakeMl,
+      mealsCompleted,
+      mealsSkipped,
+      dietCompliance,
+      workoutCompleted: dto.workoutCompleted ?? checkin.workoutCompleted,
+      notes: dto.notes ?? checkin.notes,
+      aggregatedAt: checkin.aggregatedAt,
     });
+  }
+
+  async refreshToday(userId: string) {
+    return this.dailyAggregator.rebuildForDate(
+      userId,
+      startOfLocalCalendarDay(),
+    );
   }
 
   async findAll(userId: string, query: PaginationQueryDto) {
     const { page, limit, skip } = getPagination(query);
-    const where = { userId };
     const [items, total] = await Promise.all([
-      this.prisma.dailyCheckin.findMany({
-        where,
-        skip,
-        take: limit,
-        orderBy: { checkInDate: 'desc' },
-      }),
-      this.prisma.dailyCheckin.count({ where }),
+      this.dailyCheckinRepository.findMany(userId, { skip, take: limit }),
+      this.dailyCheckinRepository.count(userId),
     ]);
     return paginatedResponse(items, total, page, limit);
   }
 
   async getMonthlyStats(userId: string) {
     const now = new Date();
-    const start = new Date(now.getFullYear(), now.getMonth(), 1);
-    const end = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59);
+    const start = new Date(Date.UTC(now.getFullYear(), now.getMonth(), 1));
+    const end = new Date(
+      Date.UTC(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59),
+    );
 
-    const checkins = await this.prisma.dailyCheckin.findMany({
-      where: {
-        userId,
-        checkInDate: { gte: start, lte: end },
-      },
-    });
+    const checkins = await this.dailyCheckinRepository.findInRange(
+      userId,
+      start,
+      end,
+    );
 
     const totalDays = checkins.length;
     const avgCompliance =
       totalDays > 0
         ? Math.round(
-            checkins.reduce((sum, c) => sum + (c.dietCompliance ?? 0), 0) / totalDays,
+            checkins.reduce((sum, c) => sum + (c.dietCompliance ?? 0), 0) /
+              totalDays,
           )
         : 0;
     const workoutsCompleted = checkins.filter((c) => c.workoutCompleted).length;
@@ -105,19 +111,17 @@ export class CheckinsService {
       avgCalories:
         totalDays > 0
           ? Math.round(
-              checkins.reduce((sum, c) => sum + (c.caloriesConsumed ?? 0), 0) / totalDays,
+              checkins.reduce((sum, c) => sum + (c.caloriesConsumed ?? 0), 0) /
+                totalDays,
             )
           : 0,
       avgProtein:
         totalDays > 0
           ? Math.round(
-              checkins.reduce((sum, c) => sum + (c.proteinConsumed ?? 0), 0) / totalDays,
+              checkins.reduce((sum, c) => sum + (c.proteinConsumed ?? 0), 0) /
+                totalDays,
             )
           : 0,
     }).data;
   }
-}
-
-function startOfDay(date: Date) {
-  return new Date(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()));
 }
