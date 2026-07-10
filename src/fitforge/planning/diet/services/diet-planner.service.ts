@@ -474,7 +474,7 @@ function computeCompliance(meals: ReturnType<typeof buildMealSlots>) {
 }
 
 function resolveDayNumber(
-  mealPlan: { startDate: Date | null; items: MealPlanItem[] },
+  mealPlan: { startDate: Date | string | null; items: MealPlanItem[] },
   date: Date,
 ) {
   const maxDay = mealPlan.items.reduce((max, item) => Math.max(max, item.dayNumber), 7);
@@ -492,8 +492,21 @@ function parseDateOnly(value: string) {
   return new Date(Date.UTC(year, month - 1, day));
 }
 
-function startOfLocalDay(date: Date) {
-  return new Date(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()));
+/** Accept Date or ISO string (e.g. Redis-cached meal plan startDate). */
+function toDate(value: Date | string): Date {
+  if (value instanceof Date) {
+    return value;
+  }
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.getTime())) {
+    throw new TypeError(`Invalid date value: ${String(value)}`);
+  }
+  return parsed;
+}
+
+function startOfLocalDay(date: Date | string) {
+  const d = toDate(date);
+  return new Date(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()));
 }
 
 function percentOf(current: number, target: number) {
