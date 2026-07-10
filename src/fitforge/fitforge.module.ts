@@ -8,10 +8,14 @@ import { NutritionPreferencesModule } from './onboarding/nutrition-preferences/n
 import { TransformationModule } from './planning/transformation/transformation.module';
 import { DietModule } from './planning/diet/diet.module';
 import { MealPlansModule } from './planning/meal-plans/meal-plans.module';
+import { GroceryModule } from './planning/grocery/grocery.module';
+import { MealsExecutionModule } from './execution/meals/meals-execution.module';
+import { HydrationExecutionModule } from './execution/hydration/hydration-execution.module';
 import { CheckinsModule } from './tracking/checkins/checkins.module';
 import { ProgressModule } from './tracking/progress/progress.module';
 import { UploadsModule } from './media/uploads/uploads.module';
-import { GroceryModule } from './planning/grocery/grocery.module';
+import { WorkoutsModule } from './training/workouts/workouts.module';
+import { AiChatModule } from './ai/chat/ai-chat.module';
 
 @Module({
   imports: [
@@ -25,9 +29,13 @@ import { GroceryModule } from './planning/grocery/grocery.module';
     DietModule,
     MealPlansModule,
     GroceryModule,
+    MealsExecutionModule,
+    HydrationExecutionModule,
+    WorkoutsModule,
     CheckinsModule,
     ProgressModule,
     UploadsModule,
+    AiChatModule,
   ],
 })
 export class FitforgeModule {}

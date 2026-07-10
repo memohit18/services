@@ -49,6 +49,17 @@ export class CheckinsController {
       .then((data) => successResponse(data, 'Daily summary refreshed'));
   }
 
+  @Get('today')
+  @ApiOperation({
+    summary:
+      "Today's score — calories, protein, meals, workout, water, compliance",
+  })
+  today(@CurrentUser() user: CurrentUserPayload) {
+    return this.checkinsService
+      .getTodayScore(user.userId)
+      .then((data) => successResponse(data));
+  }
+
   @Post('hydration')
   @ApiOperation({ summary: 'Log hydration event (source of truth for water)' })
   logHydration(

@@ -1,13 +1,17 @@
-import { ApiProperty } from '@nestjs/swagger';
-import { IsString, IsUUID, MinLength } from 'class-validator';
+import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
+import { IsOptional, IsString, IsUUID, MinLength } from 'class-validator';
 
 /** PRD-aligned chat body: POST /ai/chat */
 export class AiChatDto {
-  @ApiProperty({ format: 'uuid' })
+  @ApiPropertyOptional({
+    format: 'uuid',
+    description: 'Omit to auto-create a new session',
+  })
+  @IsOptional()
   @IsUUID()
-  sessionId: string;
+  sessionId?: string;
 
-  @ApiProperty({ example: 'I skipped breakfast' })
+  @ApiProperty({ example: 'I skipped breakfast.' })
   @IsString()
   @MinLength(1)
   message: string;

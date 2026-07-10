@@ -50,7 +50,10 @@ export function aggregateDailyCheckin(
   input: DailyAggregateInput,
 ): DailyAggregateResult {
   const mealsCompleted = input.mealLogs.filter(
-    (l) => l.status === 'completed' || l.status === 'replaced',
+    (l) =>
+      l.status === 'completed' ||
+      l.status === 'replaced' ||
+      l.status === 'partial',
   ).length;
   const mealsSkipped = input.mealLogs.filter(
     (l) => l.status === 'skipped',
@@ -62,10 +65,20 @@ export function aggregateDailyCheckin(
       : 0;
 
   const caloriesFromMeals = input.mealLogs
-    .filter((l) => l.status === 'completed' || l.status === 'replaced')
+    .filter(
+      (l) =>
+        l.status === 'completed' ||
+        l.status === 'replaced' ||
+        l.status === 'partial',
+    )
     .reduce((sum, l) => sum + (l.actualCalories ?? 0), 0);
   const proteinFromMeals = input.mealLogs
-    .filter((l) => l.status === 'completed' || l.status === 'replaced')
+    .filter(
+      (l) =>
+        l.status === 'completed' ||
+        l.status === 'replaced' ||
+        l.status === 'partial',
+    )
     .reduce((sum, l) => sum + (l.actualProtein ?? 0), 0);
 
   const waterIntakeMl = input.hydrationLogs.reduce(

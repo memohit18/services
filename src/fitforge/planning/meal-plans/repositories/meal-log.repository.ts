@@ -59,6 +59,8 @@ export class MealLogRepository {
     replacementFoodId?: string | null;
     actualCalories?: number | null;
     actualProtein?: number | null;
+    consumedQuantity?: number | null;
+    notes?: string | null;
     dayStart: Date;
     dayEnd: Date;
   }) {
@@ -72,17 +74,21 @@ export class MealLogRepository {
         orderBy: { createdAt: 'desc' },
       });
 
+      const data = {
+        status: params.status,
+        originalFoodId: params.originalFoodId,
+        replacementFoodId: params.replacementFoodId ?? null,
+        actualCalories: params.actualCalories ?? null,
+        actualProtein: params.actualProtein ?? null,
+        consumedQuantity: params.consumedQuantity ?? null,
+        notes: params.notes ?? null,
+        consumedAt: new Date(),
+      };
+
       if (existing) {
         return tx.mealLog.update({
           where: { id: existing.id },
-          data: {
-            status: params.status,
-            originalFoodId: params.originalFoodId,
-            replacementFoodId: params.replacementFoodId ?? null,
-            actualCalories: params.actualCalories ?? null,
-            actualProtein: params.actualProtein ?? null,
-            consumedAt: new Date(),
-          },
+          data,
           include: {
             mealPlanItem: { include: { food: true } },
             replacementFood: true,
@@ -95,12 +101,7 @@ export class MealLogRepository {
         data: {
           userId: params.userId,
           mealPlanItemId: params.mealPlanItemId,
-          status: params.status,
-          originalFoodId: params.originalFoodId,
-          replacementFoodId: params.replacementFoodId ?? null,
-          actualCalories: params.actualCalories ?? null,
-          actualProtein: params.actualProtein ?? null,
-          consumedAt: new Date(),
+          ...data,
         },
         include: {
           mealPlanItem: { include: { food: true } },

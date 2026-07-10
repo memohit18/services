@@ -71,6 +71,54 @@ export class CheckinsService {
     );
   }
 
+  /**
+   * Today's score card — rebuilds from events then returns dashboard metrics.
+   */
+  async getTodayScore(userId: string) {
+    const checkin = await this.dailyAggregator.rebuildForDate(
+      userId,
+      startOfLocalCalendarDay(),
+    );
+
+    const mealsAssigned = checkin.mealsCompleted + checkin.mealsSkipped;
+    const mealScore =
+      mealsAssigned > 0
+        ? Math.round((checkin.mealsCompleted / mealsAssigned) * 100)
+        : 0;
+    const workoutScore = checkin.workoutCompleted ? 100 : 0;
+    const waterTarget = 4000;
+    const waterScore = Math.min(
+      100,
+      Math.round(((checkin.waterIntakeMl ?? 0) / waterTarget) * 100),
+    );
+    const todayScore = Math.round(
+      mealScore * 0.45 + workoutScore * 0.35 + waterScore * 0.2,
+    );
+
+    return {
+      date: checkin.checkInDate.toISOString().slice(0, 10),
+      todayScore,
+      calories: checkin.caloriesConsumed ?? 0,
+      protein: checkin.proteinConsumed ?? 0,
+      meals: {
+        completed: checkin.mealsCompleted,
+        skipped: checkin.mealsSkipped,
+        assigned: mealsAssigned,
+      },
+      workout: {
+        completed: checkin.workoutCompleted,
+        score: workoutScore,
+      },
+      water: {
+        currentMl: checkin.waterIntakeMl ?? 0,
+        targetMl: waterTarget,
+        percent: waterScore,
+      },
+      compliance: checkin.dietCompliance ?? mealScore,
+      checkin,
+    };
+  }
+
   async findAll(userId: string, query: PaginationQueryDto) {
     const { page, limit, skip } = getPagination(query);
     const [items, total] = await Promise.all([

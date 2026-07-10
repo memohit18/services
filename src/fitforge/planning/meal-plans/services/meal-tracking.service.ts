@@ -129,8 +129,13 @@ export class MealTrackingService {
     let completed = 0;
 
     for (const meal of today.meals) {
-      if (meal.status === 'completed' || meal.status === 'replaced') {
+      if (
+        meal.status === 'completed' ||
+        meal.status === 'replaced' ||
+        meal.status === 'partial'
+      ) {
         completed += 1;
+        // partial uses planned macros as upper bound; actuals live on MealLog
         calories += meal.calories;
         protein += meal.protein;
         carbs += meal.carbs;
@@ -166,12 +171,42 @@ export class MealTrackingService {
     };
   }
 
-  async complete(userId: string, mealItemId: string) {
-    return this.setStatus(userId, mealItemId, 'completed');
+  async complete(
+    userId: string,
+    mealItemId: string,
+    opts?: { consumedQuantity?: number; notes?: string },
+  ) {
+    const qty = opts?.consumedQuantity ?? 1;
+    return this.setStatus(userId, mealItemId, 'completed', {
+      consumedQuantity: qty,
+      notes: opts?.notes,
+      scale: qty,
+    });
   }
 
-  async skip(userId: string, mealItemId: string) {
-    return this.setStatus(userId, mealItemId, 'skipped');
+  async partial(
+    userId: string,
+    mealItemId: string,
+    opts: { consumedQuantity: number; notes?: string },
+  ) {
+    if (opts.consumedQuantity <= 0 || opts.consumedQuantity >= 1) {
+      throw new BadRequestException(
+        'consumedQuantity for partial must be between 0 and 1 (exclusive of 0 and 1)',
+      );
+    }
+    return this.setStatus(userId, mealItemId, 'partial', {
+      consumedQuantity: opts.consumedQuantity,
+      notes: opts.notes,
+      scale: opts.consumedQuantity,
+    });
+  }
+
+  async skip(userId: string, mealItemId: string, notes?: string) {
+    return this.setStatus(userId, mealItemId, 'skipped', {
+      consumedQuantity: 0,
+      notes,
+      scale: 0,
+    });
   }
 
   async replace(userId: string, mealItemId: string, dto: ReplaceMealDto) {
@@ -216,6 +251,7 @@ export class MealTrackingService {
       replacementFoodId: replacement.id,
       actualCalories: calories,
       actualProtein: protein,
+      consumedQuantity: 1,
       dayStart,
       dayEnd,
     });
@@ -229,6 +265,11 @@ export class MealTrackingService {
     userId: string,
     mealItemId: string,
     status: (typeof MEAL_LOG_STATUSES)[number],
+    opts: {
+      consumedQuantity?: number;
+      notes?: string;
+      scale: number;
+    },
   ) {
     const item = await this.mealItemRepository.findByIdForUser(
       mealItemId,
@@ -239,13 +280,20 @@ export class MealTrackingService {
     }
 
     const { dayStart, dayEnd } = this.todayBounds();
+    const scale = opts.scale;
     const log = await this.mealLogRepository.upsertTodayStatus({
       userId,
       mealPlanItemId: mealItemId,
       status,
       originalFoodId: item.foodId,
-      actualCalories: status === 'completed' ? item.calories : 0,
-      actualProtein: status === 'completed' ? item.protein : 0,
+      actualCalories:
+        status === 'skipped' ? 0 : Math.round(item.calories * scale),
+      actualProtein:
+        status === 'skipped'
+          ? 0
+          : Math.round(item.protein * scale * 10) / 10,
+      consumedQuantity: opts.consumedQuantity ?? null,
+      notes: opts.notes ?? null,
       dayStart,
       dayEnd,
     });
@@ -267,9 +315,9 @@ export class MealTrackingService {
     const proteinDrift =
       item.protein === 0 ? 0 : Math.abs(protein - item.protein) / item.protein;
 
-    if (calorieDrift > 0.35 || proteinDrift > 0.35) {
+    if (calorieDrift > 0.1 || proteinDrift > 0.1) {
       throw new BadRequestException(
-        'Replacement food macros differ too much from the original meal (calories/protein must stay within ~35%)',
+        'Replacement food macros differ too much from the original meal (calories/protein must stay within ±10%)',
       );
     }
   }

@@ -1,7 +1,7 @@
 {
   "info": {
     "name": "FitForge API",
-    "description": "# Setup\n1. Set `baseUrl` (default http://localhost:3303)\n2. Set `accessToken` from auth-service\n\nAll routes use Bearer auth unless noted.\n\n# Response envelope\n```json\n{ \"success\": true, \"message\": \"...\", \"data\": {} }\n```\n\n# Phases\n- **01** Fitness Profile (Phase 1)\n- **02** Transformation (Phase 2)\n- **03** Foods, Food Preferences & Nutrition Preferences (Phase 3)\n- **04** AI Diet Planner (Phase 4)\n- **05** Meal Planning Engine (Phase 5)\n- **06** Daily Check-ins / Execution Events (pre–Phase 8)\n- **07** Progress Tracking & Analytics (Phase 7)",
+    "description": "# Setup\n1. Set `baseUrl` (default http://localhost:3303)\n2. Set `accessToken` from auth-service\n\nAll routes use Bearer auth unless noted.\n\n# Response envelope\n```json\n{ \"success\": true, \"message\": \"...\", \"data\": {} }\n```\n\n# Phases\n- **01** Fitness Profile (Phase 1)\n- **02** Transformation (Phase 2)\n- **03** Foods, Food Preferences & Nutrition Preferences (Phase 3)\n- **04** AI Diet Planner (Phase 4)\n- **05** Meal Planning Engine (Phase 5)\n- **06** Daily Check-ins / Execution Events\n- **07** Progress Tracking & Analytics (Phase 7)\n- **08** Daily Execution + AI Coach (Phase 8)",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
   },
   "variable": [
@@ -13,7 +13,10 @@
     { "key": "mealPlanId", "value": "" },
     { "key": "mealItemId", "value": "" },
     { "key": "progressPhotoId", "value": "" },
-    { "key": "workoutPlanDayId", "value": "" }
+    { "key": "workoutPlanDayId", "value": "" },
+    { "key": "workoutSessionId", "value": "" },
+    { "key": "workoutExerciseId", "value": "" },
+    { "key": "aiSessionId", "value": "" }
   ],
   "auth": {
     "type": "bearer",
@@ -106,6 +109,7 @@
         { "name": "POST Workout Session Log", "request": { "method": "POST", "header": [{ "key": "Content-Type", "value": "application/json" }], "url": "{{baseUrl}}/checkins/workout-sessions", "body": { "mode": "raw", "raw": "{\n  \"workoutPlanDayId\": \"{{workoutPlanDayId}}\",\n  \"durationMinutes\": 45,\n  \"caloriesBurned\": 320,\n  \"status\": \"completed\"\n}" } } },
         { "name": "GET Today Workout Sessions", "request": { "method": "GET", "url": "{{baseUrl}}/checkins/workout-sessions/today" } },
         { "name": "POST Refresh Daily Summary", "request": { "method": "POST", "url": "{{baseUrl}}/checkins/refresh", "description": "Rebuild DailyCheckin from meal/hydration/workout/progress events" } },
+        { "name": "GET Today Score", "request": { "method": "GET", "url": "{{baseUrl}}/checkins/today" } },
         { "name": "POST Check-in (legacy overrides ok)", "request": { "method": "POST", "header": [{ "key": "Content-Type", "value": "application/json" }], "url": "{{baseUrl}}/checkins", "body": { "mode": "raw", "raw": "{\n  \"notes\": \"Felt strong\"\n}" } } },
         { "name": "GET Check-ins", "request": { "method": "GET", "url": "{{baseUrl}}/checkins?page=1&limit=20" } },
         { "name": "GET Check-in Stats", "request": { "method": "GET", "url": "{{baseUrl}}/checkins/stats" } }
@@ -123,6 +127,22 @@
         { "name": "POST Progress Photos", "request": { "method": "POST", "header": [{ "key": "Content-Type", "value": "application/json" }], "url": "{{baseUrl}}/progress/photos", "body": { "mode": "raw", "raw": "{\n  \"frontImageUrl\": \"https://cdn.example.com/uploads/user/front.jpg\",\n  \"sideImageUrl\": \"https://cdn.example.com/uploads/user/side.jpg\",\n  \"backImageUrl\": \"https://cdn.example.com/uploads/user/back.jpg\"\n}" } } },
         { "name": "GET Progress Photos", "request": { "method": "GET", "url": "{{baseUrl}}/progress/photos?page=1&limit=20" } },
         { "name": "DELETE Progress Photo", "request": { "method": "DELETE", "url": "{{baseUrl}}/progress/photos/{{progressPhotoId}}" } }
+      ]
+    },
+    {
+      "name": "08 — Daily Execution + AI Coach (Phase 8)",
+      "item": [
+        { "name": "POST Complete Meal", "request": { "method": "POST", "header": [{ "key": "Content-Type", "value": "application/json" }], "url": "{{baseUrl}}/meals/{{mealItemId}}/complete", "body": { "mode": "raw", "raw": "{\n  \"consumedQuantity\": 1.0,\n  \"notes\": \"Finished all\"\n}" } } },
+        { "name": "POST Partial Meal", "request": { "method": "POST", "header": [{ "key": "Content-Type", "value": "application/json" }], "url": "{{baseUrl}}/meals/{{mealItemId}}/partial", "body": { "mode": "raw", "raw": "{\n  \"consumedQuantity\": 0.5\n}" } } },
+        { "name": "POST Skip Meal", "request": { "method": "POST", "url": "{{baseUrl}}/meals/{{mealItemId}}/skip" } },
+        { "name": "POST Replace Meal", "request": { "method": "POST", "header": [{ "key": "Content-Type", "value": "application/json" }], "url": "{{baseUrl}}/meals/{{mealItemId}}/replace", "body": { "mode": "raw", "raw": "{\n  \"foodId\": \"{{foodId}}\"\n}" } } },
+        { "name": "POST Start Workout Session", "request": { "method": "POST", "header": [{ "key": "Content-Type", "value": "application/json" }], "url": "{{baseUrl}}/workouts/session/start", "body": { "mode": "raw", "raw": "{\n  \"workoutPlanDayId\": \"{{workoutPlanDayId}}\"\n}" } } },
+        { "name": "POST Complete Exercise", "request": { "method": "POST", "header": [{ "key": "Content-Type", "value": "application/json" }], "url": "{{baseUrl}}/workouts/exercise/complete", "body": { "mode": "raw", "raw": "{\n  \"workoutPlanExerciseId\": \"{{workoutExerciseId}}\",\n  \"sessionId\": \"{{workoutSessionId}}\",\n  \"sets\": 3,\n  \"reps\": \"10\",\n  \"weight\": 60,\n  \"duration\": 12\n}" } } },
+        { "name": "POST End Workout Session", "request": { "method": "POST", "header": [{ "key": "Content-Type", "value": "application/json" }], "url": "{{baseUrl}}/workouts/session/end", "body": { "mode": "raw", "raw": "{\n  \"sessionId\": \"{{workoutSessionId}}\",\n  \"durationMinutes\": 45,\n  \"caloriesBurned\": 320\n}" } } },
+        { "name": "POST Hydration", "request": { "method": "POST", "header": [{ "key": "Content-Type", "value": "application/json" }], "url": "{{baseUrl}}/hydration", "body": { "mode": "raw", "raw": "{\n  \"amountMl\": 250\n}" } } },
+        { "name": "GET Hydration Today", "request": { "method": "GET", "url": "{{baseUrl}}/hydration/today" } },
+        { "name": "POST AI Chat", "request": { "method": "POST", "header": [{ "key": "Content-Type", "value": "application/json" }], "url": "{{baseUrl}}/ai/chat", "body": { "mode": "raw", "raw": "{\n  \"message\": \"I skipped breakfast.\"\n}" } } },
+        { "name": "POST AI Chat (existing session)", "request": { "method": "POST", "header": [{ "key": "Content-Type", "value": "application/json" }], "url": "{{baseUrl}}/ai/chat", "body": { "mode": "raw", "raw": "{\n  \"sessionId\": \"{{aiSessionId}}\",\n  \"message\": \"What should I eat for lunch?\"\n}" } } }
       ]
     }
   ]

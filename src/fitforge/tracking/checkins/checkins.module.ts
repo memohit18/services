@@ -24,6 +24,7 @@ import { WorkoutSessionService } from './services/workout-session.service';
     HydrationService,
     WorkoutSessionService,
     CheckinsService,
+    HydrationLogRepository,
   ],
 })
 export class CheckinsModule {}
