@@ -12,6 +12,7 @@ import { GroceryModule } from './planning/grocery/grocery.module';
 import { MealsExecutionModule } from './execution/meals/meals-execution.module';
 import { HydrationExecutionModule } from './execution/hydration/hydration-execution.module';
 import { CheckinsModule } from './tracking/checkins/checkins.module';
+import { DashboardModule } from './tracking/dashboard/dashboard.module';
 import { ProgressModule } from './tracking/progress/progress.module';
 import { UploadsModule } from './media/uploads/uploads.module';
 import { WorkoutsModule } from './training/workouts/workouts.module';
@@ -33,6 +34,7 @@ import { AiChatModule } from './ai/chat/ai-chat.module';
     HydrationExecutionModule,
     WorkoutsModule,
     CheckinsModule,
+    DashboardModule,
     ProgressModule,
     UploadsModule,
     AiChatModule,

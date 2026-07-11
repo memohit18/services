@@ -1,7 +1,8 @@
 {
   "info": {
     "name": "FitForge API",
-    "description": "# Setup\n1. Set `baseUrl` (default http://localhost:3303)\n2. Set `accessToken` from auth-service\n\nAll routes use Bearer auth unless noted.\n\n# Response envelope\n```json\n{ \"success\": true, \"message\": \"...\", \"data\": {} }\n```\n\n# Phases\n- **01** Fitness Profile (Phase 1)\n- **02** Transformation (Phase 2)\n- **03** Foods, Food Preferences & Nutrition Preferences (Phase 3)\n- **04** AI Diet Planner (Phase 4)\n- **05** Meal Planning Engine (Phase 5)\n- **06** Daily Check-ins / Execution Events\n- **07** Progress Tracking & Analytics (Phase 7)\n- **08** Daily Execution + AI Coach (Phase 8)",
+    "description": "# Setup\n1. Set `baseUrl` (default http://localhost:3303)\n2. Set `accessToken` from auth-service\n\nAll routes use Bearer auth unless noted.\n\n# Response envelope\n```json\n{ \"success\": true, \"message\": \"...\", \"data\": {} }\n```\n\n# Phases\n- **01** Fitness Profile (Phase 1)\n- **02** Transformation (Phase 2)\n- **03** Foods, Food Preferences & Nutrition Preferences (Phase 3)\n- **04** AI Diet Planner (Phase 4)\n- **05** Meal Planning Engine (Phase 5)\n- **06** Daily Check-ins / Execution Events\n- **07** Progress Tracking & Analytics (Phase 7)\n- **08** Daily Execution + AI Coach (Phase 8)
+- **08.2** Daily Dashboard & Compliance Engine",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
   },
   "variable": [
@@ -156,6 +157,16 @@
         { "name": "GET Hydration Today", "request": { "method": "GET", "url": "{{baseUrl}}/hydration/today" } },
         { "name": "POST AI Chat", "request": { "method": "POST", "header": [{ "key": "Content-Type", "value": "application/json" }], "url": "{{baseUrl}}/ai/chat", "body": { "mode": "raw", "raw": "{\n  \"message\": \"I skipped breakfast.\"\n}" } } },
         { "name": "POST AI Chat (existing session)", "request": { "method": "POST", "header": [{ "key": "Content-Type", "value": "application/json" }], "url": "{{baseUrl}}/ai/chat", "body": { "mode": "raw", "raw": "{\n  \"sessionId\": \"{{aiSessionId}}\",\n  \"message\": \"What should I eat for lunch?\"\n}" } } }
+      ]
+    },
+    {
+      "name": "08.2 — Daily Dashboard & Compliance",
+      "item": [
+        { "name": "GET Dashboard", "request": { "method": "GET", "url": "{{baseUrl}}/dashboard", "description": "Full daily dashboard: score, meals, workout, water, macros, streak, achievements" } },
+        { "name": "GET Dashboard Today", "request": { "method": "GET", "url": "{{baseUrl}}/dashboard/today" } },
+        { "name": "GET Dashboard Compliance", "request": { "method": "GET", "url": "{{baseUrl}}/dashboard/compliance" } },
+        { "name": "GET Dashboard Streak", "request": { "method": "GET", "url": "{{baseUrl}}/dashboard/streak" } },
+        { "name": "GET Dashboard Summary", "request": { "method": "GET", "url": "{{baseUrl}}/dashboard/summary" } }
       ]
     }
   ]
