@@ -3,6 +3,7 @@ import type { AiMessage, DietPlan } from '@prisma/client';
 import type {
   CoachContext,
   WorkoutPlanWithDays,
+  WorkoutProgressSnapshot,
 } from './ai-context.builder';
 
 /**
@@ -34,7 +35,9 @@ Budget: ${ctx.profile.budgetPreference}`
 Transformation:
 ${
   ctx.transformation
-    ? `Current weight: ${ctx.transformation.currentWeightKg ?? 'n/a'} kg → Target: ${ctx.transformation.targetWeightKg ?? 'n/a'} kg (${ctx.transformation.estimatedWeeks ?? '?'} weeks)`
+    ? `Current weight: ${ctx.transformation.currentWeightKg ?? 'n/a'} kg → Target: ${ctx.transformation.targetWeightKg ?? 'n/a'} kg (${ctx.transformation.estimatedWeeks ?? '?'} weeks)
+Calories target: ${ctx.transformation.dailyCalorieTarget ?? 'n/a'}
+Protein target: ${ctx.transformation.proteinTarget ?? 'n/a'}g`
     : 'No active transformation plan.'
 }
 
@@ -55,15 +58,28 @@ ${this.formatDietSummary(ctx.activeDiet)}
 Today's Meals:
 ${this.formatTodayMeals(ctx)}
 
-Today's Hydration: ${ctx.todayWaterMl} ml
+Today's Hydration: ${ctx.todayWaterMl} ml (target ${ctx.dayScore?.waterTargetMl ?? 4000} ml)
+
+Workout Progress Today:
+${this.formatWorkoutProgress(ctx.workoutProgress)}
 
 Current Workout Plan:
 ${this.formatWorkoutSummary(ctx.activeWorkout)}
 
-Progress & Accountability:
+Progress Logs:
 ${this.formatProgressSummary(ctx)}
 
-Compliance today: ${ctx.compliancePercent ?? 'n/a'}%
+Compliance:
+Overall score: ${ctx.compliancePercent ?? 'n/a'}%
+Breakdown: meals ${ctx.dayScore?.breakdown.meals ?? 'n/a'}%, workout ${ctx.dayScore?.breakdown.workout ?? 'n/a'}%, calories ${ctx.dayScore?.breakdown.calories ?? 'n/a'}%, protein ${ctx.dayScore?.breakdown.protein ?? 'n/a'}%, water ${ctx.dayScore?.breakdown.water ?? 'n/a'}%
+Remaining today: ${ctx.dayScore?.remainingCalories ?? 'n/a'} kcal, ${ctx.dayScore?.remainingProtein ?? 'n/a'}g protein
+
+Current Streak:
+${
+  ctx.streak
+    ? `Current: ${ctx.streak.currentStreak} day(s), Longest: ${ctx.streak.longestStreak}, Compliant today: ${ctx.streak.compliantToday ? 'yes' : 'no'}`
+    : 'No streak data.'
+}
 
 Conversation History:
 ${this.formatHistory(history)}
@@ -73,11 +89,12 @@ ${userMessage}
 
 Instructions:
 - Be concise and actionable.
-- Reference today's meals, water, compliance, and progress when relevant.
-- If the user skipped a meal, suggest a recovery strategy within their calorie/protein targets.
+- Reference today's meals, water, compliance, streak, and workout progress when relevant.
+- If the user skipped a meal, suggest a recovery meal/snack within remaining calories and protein.
 - Suggest meal swaps matching their diet type when they dislike a food.
 - Do not invent medical diagnoses.
-- Do not claim access to data beyond this context.`;
+- Do not claim access to data beyond this context.
+- Reply in plain language (no JSON).`;
   }
 
   /** Alias used by legacy AiCoachService */
@@ -125,6 +142,19 @@ Instructions:
       `Goal: ${workout.goal ?? 'n/a'}`,
       `Days/week: ${workout.daysPerWeek ?? workout.days.length}`,
       ...dayLines,
+    ].join('\n');
+  }
+
+  private formatWorkoutProgress(progress: WorkoutProgressSnapshot): string {
+    if (!progress.sessionId && !progress.workoutCompletedToday) {
+      return 'No workout session started today.';
+    }
+    return [
+      `Session: ${progress.sessionId ?? 'n/a'} (${progress.status ?? 'n/a'})`,
+      `Day: ${progress.dayTitle ?? 'n/a'}`,
+      `Exercises: ${progress.exercisesCompleted} completed / ${progress.exercisesSkipped} skipped / ${progress.exercisesPlanned} planned`,
+      `Sets logged: ${progress.setsLogged}`,
+      `Completed today: ${progress.workoutCompletedToday ? 'yes' : 'no'}`,
     ].join('\n');
   }
 

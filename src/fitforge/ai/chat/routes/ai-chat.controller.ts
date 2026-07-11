@@ -1,5 +1,20 @@
-import { Body, Controller, Get, Param, Post, Query } from '@nestjs/common';
-import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
+import {
+  Body,
+  Controller,
+  Delete,
+  Get,
+  HttpCode,
+  HttpStatus,
+  Param,
+  Post,
+  Query,
+} from '@nestjs/common';
+import {
+  ApiBearerAuth,
+  ApiOperation,
+  ApiResponse,
+  ApiTags,
+} from '@nestjs/swagger';
 import { CurrentUser } from '../../../../common/decorators/current-user.decorator';
 import type { CurrentUserPayload } from '../../../../common/decorators/current-user.decorator';
 import { PaginationQueryDto } from '../../../../common/dto/pagination-query.dto';
@@ -9,7 +24,7 @@ import { AiChatDto } from '../dto/ai-chat.dto';
 import { SendAiMessageDto } from '../dto/send-ai-message.dto';
 import { AiChatService } from '../services/ai-chat.service';
 
-@ApiTags('AI Coach')
+@ApiTags('AI Coach (Phase 8.3)')
 @ApiBearerAuth()
 @Controller('ai')
 export class AiChatController {
@@ -17,8 +32,10 @@ export class AiChatController {
 
   @Post('chat')
   @ApiOperation({
-    summary: 'Send chat message (PRD) — builds DB context + Gemini reply',
+    summary:
+      'AI Coach chat — Context Builder → Prompt → Gemini → Validator → Storage',
   })
+  @ApiResponse({ status: 200, description: '{ question, answer, timestamp, contextVersion, sessionId }' })
   chat(
     @CurrentUser() user: CurrentUserPayload,
     @Body() dto: AiChatDto,
@@ -26,6 +43,35 @@ export class AiChatController {
     return this.aiChatService
       .chat(user.userId, dto.sessionId, dto.message)
       .then((data) => successResponse(data, 'Message sent'));
+  }
+
+  @Get('history')
+  @ApiOperation({
+    summary: 'List AI Coach Q/A history (flattened turns across sessions)',
+  })
+  @ApiResponse({ status: 200 })
+  getHistory(
+    @CurrentUser() user: CurrentUserPayload,
+    @Query() query: PaginationQueryDto,
+  ) {
+    return this.aiChatService.getHistory(user.userId, query);
+  }
+
+  @Delete('history/:id')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({
+    summary:
+      'Delete a history turn (assistant message id) or an entire session id',
+  })
+  @ApiResponse({ status: 200 })
+  @ApiResponse({ status: 404, description: 'Not found' })
+  deleteHistory(
+    @CurrentUser() user: CurrentUserPayload,
+    @Param('id') id: string,
+  ) {
+    return this.aiChatService
+      .deleteHistory(user.userId, id)
+      .then((data) => successResponse(data, 'History deleted'));
   }
 
   @Post('sessions')
@@ -70,7 +116,9 @@ export class AiChatController {
   }
 
   @Post('sessions/:id/messages')
-  @ApiOperation({ summary: 'Send message — persists user + assistant turns with history' })
+  @ApiOperation({
+    summary: 'Send message — persists user + assistant turns with history',
+  })
   sendMessage(
     @CurrentUser() user: CurrentUserPayload,
     @Param('id') id: string,

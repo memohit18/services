@@ -2,7 +2,8 @@
   "info": {
     "name": "FitForge API",
     "description": "# Setup\n1. Set `baseUrl` (default http://localhost:3303)\n2. Set `accessToken` from auth-service\n\nAll routes use Bearer auth unless noted.\n\n# Response envelope\n```json\n{ \"success\": true, \"message\": \"...\", \"data\": {} }\n```\n\n# Phases\n- **01** Fitness Profile (Phase 1)\n- **02** Transformation (Phase 2)\n- **03** Foods, Food Preferences & Nutrition Preferences (Phase 3)\n- **04** AI Diet Planner (Phase 4)\n- **05** Meal Planning Engine (Phase 5)\n- **06** Daily Check-ins / Execution Events\n- **07** Progress Tracking & Analytics (Phase 7)\n- **08** Daily Execution + AI Coach (Phase 8)
-- **08.2** Daily Dashboard & Compliance Engine",
+- **08.2** Daily Dashboard & Compliance Engine
+- **08.3** AI Coach (Context → Prompt → Gemini → Validator → Storage)",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
   },
   "variable": [
@@ -18,7 +19,8 @@
     { "key": "workoutSessionId", "value": "" },
     { "key": "workoutExerciseId", "value": "" },
     { "key": "setId", "value": "" },
-    { "key": "aiSessionId", "value": "" }
+    { "key": "aiSessionId", "value": "" },
+    { "key": "aiHistoryId", "value": "" }
   ],
   "auth": {
     "type": "bearer",
@@ -155,8 +157,10 @@
         { "name": "GET Session History", "request": { "method": "GET", "url": "{{baseUrl}}/workouts/sessions/history?page=1&limit=20" } },
         { "name": "POST Hydration", "request": { "method": "POST", "header": [{ "key": "Content-Type", "value": "application/json" }], "url": "{{baseUrl}}/hydration", "body": { "mode": "raw", "raw": "{\n  \"amountMl\": 250\n}" } } },
         { "name": "GET Hydration Today", "request": { "method": "GET", "url": "{{baseUrl}}/hydration/today" } },
-        { "name": "POST AI Chat", "request": { "method": "POST", "header": [{ "key": "Content-Type", "value": "application/json" }], "url": "{{baseUrl}}/ai/chat", "body": { "mode": "raw", "raw": "{\n  \"message\": \"I skipped breakfast.\"\n}" } } },
-        { "name": "POST AI Chat (existing session)", "request": { "method": "POST", "header": [{ "key": "Content-Type", "value": "application/json" }], "url": "{{baseUrl}}/ai/chat", "body": { "mode": "raw", "raw": "{\n  \"sessionId\": \"{{aiSessionId}}\",\n  \"message\": \"What should I eat for lunch?\"\n}" } } }
+        { "name": "POST AI Chat", "request": { "method": "POST", "header": [{ "key": "Content-Type", "value": "application/json" }], "url": "{{baseUrl}}/ai/chat", "body": { "mode": "raw", "raw": "{\n  \"message\": \"I skipped lunch.\"\n}" }, "description": "Phase 8.3 — Context → Prompt → Gemini → Validator → Storage. Returns question/answer/timestamp/contextVersion" } },
+        { "name": "POST AI Chat (existing session)", "request": { "method": "POST", "header": [{ "key": "Content-Type", "value": "application/json" }], "url": "{{baseUrl}}/ai/chat", "body": { "mode": "raw", "raw": "{\n  \"sessionId\": \"{{aiSessionId}}\",\n  \"message\": \"What should I eat for lunch?\"\n}" } } },
+        { "name": "GET AI History", "request": { "method": "GET", "url": "{{baseUrl}}/ai/history?page=1&limit=20" } },
+        { "name": "DELETE AI History Turn", "request": { "method": "DELETE", "url": "{{baseUrl}}/ai/history/{{aiHistoryId}}", "description": "Delete a Q/A turn (assistant message id) or an entire session id" } }
       ]
     },
     {
