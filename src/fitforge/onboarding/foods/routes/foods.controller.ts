@@ -77,8 +77,10 @@ export class FoodsController {
 
   @Patch(':id')
   @ApiOperation({
-    summary: 'Update food (custom foods: owner only; catalog foods: admin only)',
-    description: 'Set category to null to remove it from the food.',
+    summary:
+      'Update food item (incl. imageUrl). Custom: owner only; catalog: admin only.',
+    description:
+      'Partial update. Set imageUrl from POST /images. Set category or imageUrl to null to clear.',
   })
   @ApiResponse({ status: 200, type: FoodResponseDto })
   update(

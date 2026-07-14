@@ -150,7 +150,8 @@ export class FoodsService {
       data.averageCost = dto.averageCost;
     }
     if (dto.imageUrl !== undefined) {
-      data.imageUrl = dto.imageUrl;
+      data.imageUrl =
+        dto.imageUrl === null || dto.imageUrl === '' ? null : dto.imageUrl.trim();
     }
 
     return data;
