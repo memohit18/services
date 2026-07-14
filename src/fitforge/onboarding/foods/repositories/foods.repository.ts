@@ -75,10 +75,46 @@ export class FoodsRepository {
     return this.prisma.mealPlanItem.count({ where: { foodId } });
   }
 
-  async delete(id: string): Promise<FoodMaster> {
+  /**
+   * Deletes food + preferences + meal plan items referencing it.
+   * Returns userIds whose active meal plans were affected (rebuild those).
+   */
+  async delete(id: string): Promise<{
+    food: FoodMaster;
+    removedMealPlanItems: number;
+    affectedActiveUserIds: string[];
+  }> {
     return this.prisma.$transaction(async (tx) => {
+      const items = await tx.mealPlanItem.findMany({
+        where: { foodId: id },
+        select: {
+          id: true,
+          mealPlan: { select: { userId: true, status: true } },
+        },
+      });
+
+      const removedMealPlanItems = items.length;
+      const affectedActiveUserIds = [
+        ...new Set(
+          items
+            .filter((i) => i.mealPlan.status === 'active')
+            .map((i) => i.mealPlan.userId),
+        ),
+      ];
+
+      if (removedMealPlanItems > 0) {
+        // Detach logs so meal_plan_items can be removed (FK SetNull is on delete)
+        await tx.mealLog.updateMany({
+          where: { mealPlanItemId: { in: items.map((i) => i.id) } },
+          data: { mealPlanItemId: null },
+        });
+        await tx.mealPlanItem.deleteMany({ where: { foodId: id } });
+      }
+
       await tx.userFoodPreference.deleteMany({ where: { foodId: id } });
-      return tx.foodMaster.delete({ where: { id } });
+      const food = await tx.foodMaster.delete({ where: { id } });
+
+      return { food, removedMealPlanItems, affectedActiveUserIds };
     });
   }
 

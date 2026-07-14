@@ -1,6 +1,7 @@
 import {
   BadRequestException,
   Injectable,
+  Logger,
   NotFoundException,
 } from '@nestjs/common';
 import type { FoodMaster } from '@prisma/client';
@@ -25,6 +26,8 @@ export type NormalizedMealItemInput = {
  */
 @Injectable()
 export class MealPlanNormalizer {
+  private readonly logger = new Logger(MealPlanNormalizer.name);
+
   constructor(
     private readonly prisma: PrismaService,
     private readonly mealPlanRepository: MealPlanRepository,
@@ -79,9 +82,11 @@ export class MealPlanNormalizer {
     for (const meal of response.meals) {
       const food = this.resolveFood(foodByName, meal.foodName);
       if (!food) {
-        throw new BadRequestException(
-          `Cannot normalize unknown food: ${meal.foodName}`,
+        // Food may have been deleted from catalog — skip and continue
+        this.logger.warn(
+          `Skipping unknown/removed food in AI meal plan: ${meal.foodName}`,
         );
+        continue;
       }
       const quantity = meal.quantity ?? 1;
       items.push({
@@ -94,6 +99,12 @@ export class MealPlanNormalizer {
         carbs: Math.round(food.carbs * quantity * 10) / 10,
         fats: Math.round(food.fats * quantity * 10) / 10,
       });
+    }
+
+    if (items.length === 0) {
+      throw new BadRequestException(
+        'No meal items could be resolved from available foods',
+      );
     }
 
     return items;

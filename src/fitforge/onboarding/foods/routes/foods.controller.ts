@@ -97,11 +97,10 @@ export class FoodsController {
   @Delete(':id')
   @ApiOperation({
     summary:
-      'Delete food. Custom: owner only; catalog: admin only. Blocked if used in meal plans.',
+      'Delete food. Custom: owner; catalog: admin. Removes meal-plan usages and rebuilds active plans from remaining foods.',
   })
   @ApiResponse({ status: 200 })
   @ApiResponse({ status: 403, description: 'Not allowed' })
-  @ApiResponse({ status: 409, description: 'Food is used in meal plan items' })
   remove(
     @CurrentUser() user: CurrentUserPayload,
     @Param('id') id: string,

@@ -220,6 +220,32 @@ export class MealPlansService {
     return activated;
   }
 
+  /**
+   * After a food is removed from catalog: rebuild the user's active meal plan
+   * using only foods that still exist (rule-based picker). Falls back to
+   * diet responseJson rematerialization if rule-based generation fails.
+   */
+  async rebuildActiveFromAvailableFoods(userId: string) {
+    const active = await this.mealPlanRepository.findActive(userId);
+    if (!active) {
+      return null;
+    }
+
+    try {
+      const draft = await this.mealGeneratorService.generate(userId, {
+        dietPlanId: active.dietPlanId,
+        planType: active.planType,
+      });
+      return await this.activate(userId, draft.id);
+    } catch {
+      // Rematerialize from AI diet JSON, skipping foods that no longer exist
+      return this.generateFromDiet(userId, {
+        dietPlanId: active.dietPlanId,
+        planType: active.planType,
+      });
+    }
+  }
+
   private async ensureMealPlan(userId: string, mealPlanId: string) {
     const plan = await this.prisma.mealPlan.findFirst({
       where: { id: mealPlanId, userId },

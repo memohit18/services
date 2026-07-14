@@ -1,13 +1,14 @@
 import {
-  ConflictException,
   ForbiddenException,
   Injectable,
+  Logger,
   NotFoundException,
 } from '@nestjs/common';
 import type { Prisma } from '@prisma/client';
 import { FOOD_CATEGORIES } from '../../../../../db-schema/postgres/constants/fitforge-values';
 import { getPagination } from '../../../../common/dto/pagination-query.dto';
 import { paginatedResponse } from '../../../../common/utils/api-response';
+import { MealPlansService } from '../../../planning/meal-plans/services/meal-plans.service';
 import { normalizeDietType } from '../../../shared/utils/fitness-normalizers';
 import {
   FOOD_CATEGORY_LABELS,
@@ -22,7 +23,12 @@ import { FoodsRepository } from '../repositories/foods.repository';
 
 @Injectable()
 export class FoodsService {
-  constructor(private readonly foodsRepository: FoodsRepository) {}
+  private readonly logger = new Logger(FoodsService.name);
+
+  constructor(
+    private readonly foodsRepository: FoodsRepository,
+    private readonly mealPlansService: MealPlansService,
+  ) {}
 
   async findAll(userId: string, query: ListFoodsQueryDto) {
     const { page, limit, skip } = getPagination(query);
@@ -72,27 +78,35 @@ export class FoodsService {
 
     this.assertCanModify(food, userId, role, 'delete');
 
-    const mealUsages = await this.foodsRepository.countMealPlanUsages(id);
-    if (mealUsages > 0) {
-      throw new ConflictException(
-        `Cannot delete food — it is used in ${mealUsages} meal plan item(s)`,
-      );
+    const { food: deleted, removedMealPlanItems, affectedActiveUserIds } =
+      await this.foodsRepository.delete(id);
+
+    for (const affectedUserId of affectedActiveUserIds) {
+      void this.mealPlansService
+        .rebuildActiveFromAvailableFoods(affectedUserId)
+        .catch((err: unknown) => {
+          const message = err instanceof Error ? err.message : String(err);
+          this.logger.warn(
+            `Meal plan rebuild after food delete failed for user ${affectedUserId}: ${message}`,
+          );
+        });
     }
 
-    const deleted = await this.foodsRepository.delete(id);
     return {
       id: deleted.id,
       name: deleted.name,
       deleted: true,
+      removedMealPlanItems,
+      mealPlansQueuedForRebuild: affectedActiveUserIds.length,
     };
   }
 
   async getCategories() {
     const categories = await this.foodsRepository.categories();
     return {
-      allowedCategories: FOOD_CATEGORIES.map((id) => ({
-        id,
-        label: FOOD_CATEGORY_LABELS[id],
+      allowedCategories: FOOD_CATEGORIES.map((catId) => ({
+        id: catId,
+        label: FOOD_CATEGORY_LABELS[catId],
       })),
       categories: categories.map((category) => ({
         ...category,
