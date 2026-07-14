@@ -15,6 +15,7 @@ import { CheckinsModule } from './tracking/checkins/checkins.module';
 import { DashboardModule } from './tracking/dashboard/dashboard.module';
 import { ProgressModule } from './tracking/progress/progress.module';
 import { UploadsModule } from './media/uploads/uploads.module';
+import { ImagesModule } from './media/images/images.module';
 import { WorkoutsModule } from './training/workouts/workouts.module';
 import { AiChatModule } from './ai/chat/ai-chat.module';
 
@@ -37,6 +38,7 @@ import { AiChatModule } from './ai/chat/ai-chat.module';
     DashboardModule,
     ProgressModule,
     UploadsModule,
+    ImagesModule,
     AiChatModule,
   ],
 })

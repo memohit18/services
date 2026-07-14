@@ -20,7 +20,8 @@
     { "key": "workoutExerciseId", "value": "" },
     { "key": "setId", "value": "" },
     { "key": "aiSessionId", "value": "" },
-    { "key": "aiHistoryId", "value": "" }
+    { "key": "aiHistoryId", "value": "" },
+    { "key": "imageId", "value": "" }
   ],
   "auth": {
     "type": "bearer",
@@ -171,6 +172,31 @@
         { "name": "GET Dashboard Compliance", "request": { "method": "GET", "url": "{{baseUrl}}/dashboard/compliance" } },
         { "name": "GET Dashboard Streak", "request": { "method": "GET", "url": "{{baseUrl}}/dashboard/streak" } },
         { "name": "GET Dashboard Summary", "request": { "method": "GET", "url": "{{baseUrl}}/dashboard/summary" } }
+      ]
+    },
+    {
+      "name": "09 — Images (R2 optimize + Mongo)",
+      "item": [
+        {
+          "name": "POST Upload Image",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": "{{baseUrl}}/images",
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                { "key": "type", "value": "profile", "type": "text" },
+                { "key": "file", "type": "file", "src": [] }
+              ]
+            },
+            "description": "Optimizes to original/thumbnail/small/medium/large × webp/jpeg/avif, uploads to R2 under uploads/{userId}/{type}/{imageId}/, stores metadata in MongoDB user_images"
+          }
+        },
+        { "name": "GET Images", "request": { "method": "GET", "url": "{{baseUrl}}/images?page=1&limit=20" } },
+        { "name": "GET Images by type", "request": { "method": "GET", "url": "{{baseUrl}}/images?type=profile&page=1&limit=20" } },
+        { "name": "GET Image by id", "request": { "method": "GET", "url": "{{baseUrl}}/images/{{imageId}}" } },
+        { "name": "DELETE Image", "request": { "method": "DELETE", "url": "{{baseUrl}}/images/{{imageId}}" } }
       ]
     }
   ]

@@ -43,6 +43,10 @@ import {
   TestCaseSchema,
 } from '../../db-schema/mongodb/schemas/test-case.schema';
 import {
+  USER_IMAGE_MODEL,
+  UserImageSchema,
+} from '../../db-schema/mongodb/schemas/user-image.schema';
+import {
   USER_PROGRESS_MODEL,
   UserProgressSchema,
 } from '../../db-schema/mongodb/schemas/user-progress.schema';
@@ -70,6 +74,7 @@ import {
       { name: ROADMAP_QUESTION_MODEL, schema: RoadmapQuestionSchema },
       { name: SUBMISSION_MODEL, schema: SubmissionSchema },
       { name: USER_PROGRESS_MODEL, schema: UserProgressSchema },
+      { name: USER_IMAGE_MODEL, schema: UserImageSchema },
       { name: NOTE_MODEL, schema: NoteSchema },
       { name: BOOKMARK_MODEL, schema: BookmarkSchema },
     ]),
