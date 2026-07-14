@@ -22,6 +22,15 @@ export class UserImageRepository {
     return this.model.findOne({ _id: id, userId }).exec();
   }
 
+  findByFolderPathForUser(folderPath: string, userId: string) {
+    return this.model.findOne({ folderPath, userId }).exec();
+  }
+
+  /** Match a doc that owns this exact R2 object key. */
+  findByKeyForUser(key: string, userId: string) {
+    return this.model.findOne({ userId, keys: key }).exec();
+  }
+
   findManyForUser(
     userId: string,
     opts: { type?: string; skip: number; take: number },

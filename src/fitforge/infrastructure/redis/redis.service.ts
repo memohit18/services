@@ -61,6 +61,29 @@ export class RedisService implements OnModuleInit, OnModuleDestroy {
     await this.client.set(key, payload, 'EX', ttlSeconds);
   }
 
+  /**
+   * SET key value EX ttl NX — returns true if this caller acquired the key.
+   */
+  async setNx(
+    key: string,
+    value: unknown,
+    ttlSeconds: number,
+  ): Promise<boolean> {
+    if (!this.client) {
+      return true; // no Redis → caller proceeds (in-process dedupe still applies)
+    }
+    const payload = typeof value === 'string' ? value : JSON.stringify(value);
+    const result = await this.client.set(key, payload, 'EX', ttlSeconds, 'NX');
+    return result === 'OK';
+  }
+
+  async getRaw(key: string): Promise<string | null> {
+    if (!this.client) {
+      return null;
+    }
+    return this.client.get(key);
+  }
+
   async del(...keys: string[]): Promise<void> {
     if (!this.client || keys.length === 0) {
       return;

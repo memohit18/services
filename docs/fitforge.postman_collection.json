@@ -197,7 +197,20 @@
         { "name": "GET Images", "request": { "method": "GET", "url": "{{baseUrl}}/images?page=1&limit=20" } },
         { "name": "GET Images by type", "request": { "method": "GET", "url": "{{baseUrl}}/images?type=profile&page=1&limit=20" } },
         { "name": "GET Image by id", "request": { "method": "GET", "url": "{{baseUrl}}/images/{{imageId}}" } },
-        { "name": "DELETE Image", "request": { "method": "DELETE", "url": "{{baseUrl}}/images/{{imageId}}" } }
+        { "name": "DELETE Image by id", "request": { "method": "DELETE", "url": "{{baseUrl}}/images/{{imageId}}", "description": "Deletes MongoDB row + all R2 variants for that image id." } },
+        {
+          "name": "DELETE Image by path",
+          "request": {
+            "method": "DELETE",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": "{{baseUrl}}/images/by-path",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"path\": \"uploads/USER_ID/food/IMAGE_ID\"\n}"
+            },
+            "description": "Pass path, folderPath, or url (any size). Deletes all R2 objects + MongoDB entry. Only your own uploads/{userId}/… paths."
+          }
+        }
       ]
     }
   ]
