@@ -176,7 +176,7 @@
               }
             ],
             "url": "{{baseUrl}}/profile",
-            "description": "**Response:** `{ name, email, phone, avatar, role }` — no success wrapper"
+            "description": "**Response:** `{ name, email, phone, avatar, imageUrl, role }` — no success wrapper"
           },
           "response": [
             {
@@ -190,9 +190,23 @@
                   "value": "application/json"
                 }
               ],
-              "body": "{\n  \"name\": \"Mohit\",\n  \"email\": \"user@example.com\",\n  \"phone\": null,\n  \"avatar\": null,\n  \"role\": \"user\"\n}"
+              "body": "{\n  \"name\": \"Mohit\",\n  \"email\": \"user@example.com\",\n  \"phone\": null,\n  \"avatar\": null,\n  \"imageUrl\": null,\n  \"role\": \"user\"\n}"
             }
           ]
+        },
+        {
+          "name": "PATCH /profile",
+          "request": {
+            "method": "PATCH",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": "{{baseUrl}}/profile",
+            "description": "Edit name/phone/imageUrl (or avatar). Use public URL from POST /images.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Mohit Sharma\",\n  \"phone\": \"9876543210\",\n  \"imageUrl\": \"https://cdn.example.com/uploads/userId/profile/uuid/medium.webp\"\n}"
+            }
+          },
+          "response": []
         }
       ]
     },
