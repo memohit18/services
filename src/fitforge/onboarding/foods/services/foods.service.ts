@@ -1,4 +1,5 @@
 import {
+  ConflictException,
   ForbiddenException,
   Injectable,
   NotFoundException,
@@ -58,9 +59,32 @@ export class FoodsService {
       throw new NotFoundException('Food not found');
     }
 
-    this.assertCanModify(food, userId, role);
+    this.assertCanModify(food, userId, role, 'update');
 
     return this.foodsRepository.update(id, this.toUpdateInput(dto));
+  }
+
+  async remove(userId: string, role: string, id: string) {
+    const food = await this.foodsRepository.findById(id);
+    if (!food) {
+      throw new NotFoundException('Food not found');
+    }
+
+    this.assertCanModify(food, userId, role, 'delete');
+
+    const mealUsages = await this.foodsRepository.countMealPlanUsages(id);
+    if (mealUsages > 0) {
+      throw new ConflictException(
+        `Cannot delete food — it is used in ${mealUsages} meal plan item(s)`,
+      );
+    }
+
+    const deleted = await this.foodsRepository.delete(id);
+    return {
+      id: deleted.id,
+      name: deleted.name,
+      deleted: true,
+    };
   }
 
   async getCategories() {
@@ -72,7 +96,10 @@ export class FoodsService {
       })),
       categories: categories.map((category) => ({
         ...category,
-        label: FOOD_CATEGORY_LABELS[category.id as keyof typeof FOOD_CATEGORY_LABELS] ?? category.id,
+        label:
+          FOOD_CATEGORY_LABELS[
+            category.id as keyof typeof FOOD_CATEGORY_LABELS
+          ] ?? category.id,
       })),
     };
   }
@@ -81,16 +108,19 @@ export class FoodsService {
     food: { isCustom: boolean; createdByUserId: string | null },
     userId: string,
     role: string,
+    action: 'update' | 'delete',
   ) {
     if (food.isCustom) {
       if (food.createdByUserId !== userId) {
-        throw new ForbiddenException('You can only update your own custom foods');
+        throw new ForbiddenException(
+          `You can only ${action} your own custom foods`,
+        );
       }
       return;
     }
 
     if (role !== 'admin') {
-      throw new ForbiddenException('Only admins can update catalog foods');
+      throw new ForbiddenException(`Only admins can ${action} catalog foods`);
     }
   }
 
@@ -151,7 +181,9 @@ export class FoodsService {
     }
     if (dto.imageUrl !== undefined) {
       data.imageUrl =
-        dto.imageUrl === null || dto.imageUrl === '' ? null : dto.imageUrl.trim();
+        dto.imageUrl === null || dto.imageUrl === ''
+          ? null
+          : dto.imageUrl.trim();
     }
 
     return data;

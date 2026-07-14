@@ -1,6 +1,7 @@
 import {
   Body,
   Controller,
+  Delete,
   Get,
   Param,
   Patch,
@@ -91,6 +92,23 @@ export class FoodsController {
     return this.foodsService
       .update(user.userId, user.role, id, dto)
       .then((data) => successResponse(data, 'Food updated'));
+  }
+
+  @Delete(':id')
+  @ApiOperation({
+    summary:
+      'Delete food. Custom: owner only; catalog: admin only. Blocked if used in meal plans.',
+  })
+  @ApiResponse({ status: 200 })
+  @ApiResponse({ status: 403, description: 'Not allowed' })
+  @ApiResponse({ status: 409, description: 'Food is used in meal plan items' })
+  remove(
+    @CurrentUser() user: CurrentUserPayload,
+    @Param('id') id: string,
+  ) {
+    return this.foodsService
+      .remove(user.userId, user.role, id)
+      .then((data) => successResponse(data, 'Food deleted'));
   }
 
   @Get()

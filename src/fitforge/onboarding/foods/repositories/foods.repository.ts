@@ -71,6 +71,17 @@ export class FoodsRepository {
     return this.prisma.foodMaster.update({ where: { id }, data });
   }
 
+  async countMealPlanUsages(foodId: string): Promise<number> {
+    return this.prisma.mealPlanItem.count({ where: { foodId } });
+  }
+
+  async delete(id: string): Promise<FoodMaster> {
+    return this.prisma.$transaction(async (tx) => {
+      await tx.userFoodPreference.deleteMany({ where: { foodId: id } });
+      return tx.foodMaster.delete({ where: { id } });
+    });
+  }
+
   async countByIds(ids: string[]): Promise<number> {
     if (ids.length === 0) {
       return 0;
