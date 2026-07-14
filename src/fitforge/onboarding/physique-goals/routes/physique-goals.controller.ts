@@ -1,4 +1,12 @@
-import { Body, Controller, Get, Param, Post, UseGuards } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Get,
+  Param,
+  Patch,
+  Post,
+  UseGuards,
+} from '@nestjs/common';
 import {
   ApiBearerAuth,
   ApiOperation,
@@ -10,6 +18,7 @@ import { RolesGuard } from '../../../../common/guards/roles.guard';
 import { successResponse } from '../../../../common/utils/api-response';
 import { CreatePhysiqueGoalDto } from '../dto/create-physique-goal.dto';
 import { PhysiqueGoalResponseDto } from '../dto/physique-goal-response.dto';
+import { UpdatePhysiqueGoalDto } from '../dto/update-physique-goal.dto';
 import { PhysiqueGoalsService } from '../services/physique-goals.service';
 
 @ApiTags('Physique Goals')
@@ -27,6 +36,20 @@ export class PhysiqueGoalsController {
     return this.physiqueGoalsService
       .create(dto)
       .then((data) => successResponse(data, 'Physique goal created'));
+  }
+
+  @Patch(':id')
+  @Roles('admin')
+  @UseGuards(RolesGuard)
+  @ApiOperation({
+    summary:
+      'Update physique goal (admin). :id = uuid or slug (lean). Pass imageUrl to set card art.',
+  })
+  @ApiResponse({ status: 200, type: PhysiqueGoalResponseDto })
+  update(@Param('id') id: string, @Body() dto: UpdatePhysiqueGoalDto) {
+    return this.physiqueGoalsService
+      .update(id, dto)
+      .then((data) => successResponse(data, 'Physique goal updated'));
   }
 
   @Get()

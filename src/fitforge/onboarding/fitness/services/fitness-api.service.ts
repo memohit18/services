@@ -54,6 +54,45 @@ export class FitnessApiService {
     };
   }
 
+  /** Add a new physique goal (with imageUrl for onboarding cards). */
+  async createGoal(dto: {
+    title: string;
+    description?: string;
+    imageUrl: string;
+    targetBodyFatMin?: number;
+    targetBodyFatMax?: number;
+  }) {
+    const goal = await this.physiqueGoalsService.create({
+      name: dto.title,
+      description: dto.description,
+      imageUrl: dto.imageUrl,
+      targetBodyFatMin: dto.targetBodyFatMin,
+      targetBodyFatMax: dto.targetBodyFatMax,
+    });
+    return toFitnessGoalApi(goal);
+  }
+
+  /** Edit goal fields — usually update imageUrl after POST /images. */
+  async updateGoal(
+    idOrSlug: string,
+    dto: {
+      title?: string;
+      description?: string;
+      imageUrl?: string;
+      targetBodyFatMin?: number;
+      targetBodyFatMax?: number;
+    },
+  ) {
+    const goal = await this.physiqueGoalsService.update(idOrSlug, {
+      name: dto.title,
+      description: dto.description,
+      imageUrl: dto.imageUrl,
+      targetBodyFatMin: dto.targetBodyFatMin,
+      targetBodyFatMax: dto.targetBodyFatMax,
+    });
+    return toFitnessGoalApi(goal);
+  }
+
   async getProfile(userId: string) {
     const profile = await this.fitnessProfileService.getByUserId(userId);
     return this.buildProfileResponse(userId, profile);

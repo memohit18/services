@@ -4,8 +4,10 @@ import {
   Get,
   HttpCode,
   HttpStatus,
+  Param,
   Patch,
   Post,
+  UseGuards,
 } from '@nestjs/common';
 import {
   ApiBearerAuth,
@@ -15,7 +17,13 @@ import {
 } from '@nestjs/swagger';
 import { CurrentUser } from '../../../../common/decorators/current-user.decorator';
 import type { CurrentUserPayload } from '../../../../common/decorators/current-user.decorator';
+import { Roles } from '../../../../common/decorators/roles.decorator';
+import { RolesGuard } from '../../../../common/guards/roles.guard';
 import { successResponse } from '../../../../common/utils/api-response';
+import {
+  CreateFitnessGoalApiDto,
+  UpdateFitnessGoalApiDto,
+} from '../dto/fitness-goal-api.dto';
 import {
   CreateFitnessProfileApiDto,
   UpdateFitnessProfileApiDto,
@@ -29,13 +37,52 @@ export class FitnessController {
   constructor(private readonly fitnessApiService: FitnessApiService) {}
 
   @Get('goals')
-  @ApiOperation({ summary: 'List physique goals for onboarding Step 5' })
-  @ApiResponse({ status: 200, description: '{ goals: [{ id, title, description, imageUrl }] }' })
+  @ApiOperation({
+    summary: 'List fitness goals (Lean, Bodybuilder, …) with imageUrl',
+  })
+  @ApiResponse({
+    status: 200,
+    description: '{ goals: [{ id, title, description, imageUrl }] }',
+  })
   @ApiResponse({ status: 401, description: 'Unauthorized' })
   getGoals() {
     return this.fitnessApiService
       .getGoals()
       .then((data) => successResponse(data));
+  }
+
+  @Post('goals')
+  @HttpCode(HttpStatus.CREATED)
+  @Roles('admin')
+  @UseGuards(RolesGuard)
+  @ApiOperation({
+    summary: 'Add a fitness goal with imageUrl (admin)',
+    description:
+      'Upload image via POST /images first, then pass the public URL as imageUrl.',
+  })
+  @ApiResponse({ status: 201 })
+  createGoal(@Body() dto: CreateFitnessGoalApiDto) {
+    return this.fitnessApiService
+      .createGoal(dto)
+      .then((data) => successResponse(data, 'Fitness goal created'));
+  }
+
+  @Patch('goals/:id')
+  @Roles('admin')
+  @UseGuards(RolesGuard)
+  @ApiOperation({
+    summary: 'Update fitness goal / change imageUrl (admin)',
+    description:
+      ':id is slug (lean) or uuid. Pass only imageUrl to replace the card image.',
+  })
+  @ApiResponse({ status: 200 })
+  updateGoal(
+    @Param('id') id: string,
+    @Body() dto: UpdateFitnessGoalApiDto,
+  ) {
+    return this.fitnessApiService
+      .updateGoal(id, dto)
+      .then((data) => successResponse(data, 'Fitness goal updated'));
   }
 
   @Get('profile')

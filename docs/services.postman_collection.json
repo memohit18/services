@@ -534,10 +534,10 @@
               }
             ],
             "url": "{{baseUrl}}/physique-goals",
-            "description": "Requires role=admin",
+            "description": "Requires role=admin. Pass imageUrl from POST /images.",
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"name\": \"Athletic\",\n  \"description\": \"...\",\n  \"targetBodyFatMin\": 12,\n  \"targetBodyFatMax\": 16\n}"
+              "raw": "{\n  \"name\": \"Athletic\",\n  \"description\": \"Lean and functional\",\n  \"targetBodyFatMin\": 12,\n  \"targetBodyFatMax\": 16,\n  \"imageUrl\": \"https://cdn.example.com/uploads/.../medium.webp\"\n}"
             }
           },
           "response": [
@@ -552,9 +552,29 @@
                   "value": "application/json"
                 }
               ],
-              "body": "{\n  \"success\": true,\n  \"message\": \"Physique goal created\",\n  \"data\": {\n    \"id\": \"uuid-physique-goal\",\n    \"name\": \"Athletic\",\n    \"description\": \"Lean and functional\",\n    \"targetBodyFatMin\": 12,\n    \"targetBodyFatMax\": 16,\n    \"imageUrl\": null,\n    \"createdAt\": \"2026-06-22T10:00:00.000Z\"\n  }\n}"
+              "body": "{\n  \"success\": true,\n  \"message\": \"Physique goal created\",\n  \"data\": {\n    \"id\": \"uuid-physique-goal\",\n    \"name\": \"Athletic\",\n    \"description\": \"Lean and functional\",\n    \"targetBodyFatMin\": 12,\n    \"targetBodyFatMax\": 16,\n    \"imageUrl\": \"https://cdn.example.com/uploads/.../medium.webp\",\n    \"createdAt\": \"2026-06-22T10:00:00.000Z\"\n  }\n}"
             }
           ]
+        },
+        {
+          "name": "PATCH Update imageUrl (admin)",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "disabled": false
+              }
+            ],
+            "url": "{{baseUrl}}/physique-goals/{{physiqueGoalId}}",
+            "description": "Admin only. :id = uuid or slug (lean). Body can be imageUrl only.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"imageUrl\": \"https://cdn.example.com/uploads/.../medium.webp\"\n}"
+            }
+          },
+          "response": []
         }
       ]
     },
