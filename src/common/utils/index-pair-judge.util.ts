@@ -1,22 +1,26 @@
 /**
- * Validates LeetCode-style "return two indices" answers when input has nums + target.
+ * Validates LeetCode-style "return two indices" answers when input has
+ * nums/numbers + target. Supports classic Two Sum (0-based `nums`) and
+ * Two Sum II (1-based `numbers`).
  */
-export function isIndexPairSumAnswer(
-  input: Record<string, unknown>,
-  output: unknown,
+
+function getIndexPairNums(input: Record<string, unknown>): number[] | null {
+  const raw = input.nums ?? input.numbers;
+  if (!Array.isArray(raw)) {
+    return null;
+  }
+  if (!raw.every((v) => typeof v === 'number')) {
+    return null;
+  }
+  return raw as number[];
+}
+
+function isValidZeroBasedPair(
+  nums: number[],
+  target: number,
+  left: number,
+  right: number,
 ): boolean {
-  const nums = input.nums;
-  const target = input.target;
-
-  if (!Array.isArray(nums) || typeof target !== 'number' || !Array.isArray(output)) {
-    return false;
-  }
-
-  if (output.length !== 2) {
-    return false;
-  }
-
-  const [left, right] = output;
   if (
     !Number.isInteger(left) ||
     !Number.isInteger(right) ||
@@ -28,21 +32,64 @@ export function isIndexPairSumAnswer(
   ) {
     return false;
   }
+  return nums[left] + nums[right] === target;
+}
 
-  const a = nums[left];
-  const b = nums[right];
-  if (typeof a !== 'number' || typeof b !== 'number') {
+function isValidOneBasedPair(
+  nums: number[],
+  target: number,
+  left: number,
+  right: number,
+): boolean {
+  if (
+    !Number.isInteger(left) ||
+    !Number.isInteger(right) ||
+    left === right ||
+    left < 1 ||
+    right < 1 ||
+    left > nums.length ||
+    right > nums.length
+  ) {
+    return false;
+  }
+  return nums[left - 1] + nums[right - 1] === target;
+}
+
+/**
+ * True when output is any valid index pair summing to target
+ * (0-based or 1-based).
+ */
+export function isIndexPairSumAnswer(
+  input: Record<string, unknown>,
+  output: unknown,
+): boolean {
+  const nums = getIndexPairNums(input);
+  const target = input.target;
+
+  if (!nums || typeof target !== 'number' || !Array.isArray(output)) {
     return false;
   }
 
-  return a + b === target;
+  if (output.length !== 2) {
+    return false;
+  }
+
+  const [left, right] = output;
+  if (typeof left !== 'number' || typeof right !== 'number') {
+    return false;
+  }
+
+  return (
+    isValidZeroBasedPair(nums, target, left, right) ||
+    isValidOneBasedPair(nums, target, left, right)
+  );
 }
 
 export function looksLikeIndexPairInput(input: Record<string, unknown>): boolean {
-  return Array.isArray(input.nums) && typeof input.target === 'number';
+  return getIndexPairNums(input) !== null && typeof input.target === 'number';
 }
 
-/** Ensure nums/target has exactly one valid index pair (keeps preferredPair). */
+/** Ensure nums/target has exactly one valid index pair (keeps preferredPair, 0-based). */
 export function dedupeIndexPairInput(
   nums: number[],
   target: number,
