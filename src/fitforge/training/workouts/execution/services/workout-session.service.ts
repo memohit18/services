@@ -43,7 +43,7 @@ export class WorkoutSessionService {
             workoutPlanId: day.workoutPlanId,
             exercises: day.exercises.map((e) => ({
               id: e.id,
-              name: e.exercise.name,
+              name: e.exercise?.name ?? 'Exercise',
               sets: e.sets,
               reps: e.reps,
               restSeconds: e.restSeconds,
