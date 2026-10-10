@@ -142,6 +142,19 @@ export class MealPlansController {
       .then((data) => successResponse(data, 'Meal completed'));
   }
 
+  @Post(':mealItemId/undo')
+  @ApiOperation({
+    summary: 'Phase 5: Undo today\'s meal log and mark the meal pending again',
+  })
+  undo(
+    @CurrentUser() user: CurrentUserPayload,
+    @Param('mealItemId') mealItemId: string,
+  ) {
+    return this.mealTrackingService
+      .undo(user.userId, mealItemId)
+      .then((data) => successResponse(data, 'Meal log reverted'));
+  }
+
   @Post(':mealItemId/skip')
   @ApiOperation({ summary: 'Phase 5: Skip meal' })
   skip(

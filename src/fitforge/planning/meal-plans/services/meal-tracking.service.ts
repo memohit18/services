@@ -209,6 +209,41 @@ export class MealTrackingService {
     });
   }
 
+  async undo(userId: string, mealItemId: string) {
+    const item = await this.mealItemRepository.findByIdForUser(
+      mealItemId,
+      userId,
+    );
+    if (!item) {
+      throw new NotFoundException('Meal plan item not found');
+    }
+
+    const { dayStart, dayEnd } = this.todayBounds();
+    const existing = await this.mealLogRepository.findLatestForItemOnDay(
+      userId,
+      mealItemId,
+      dayStart,
+      dayEnd,
+    );
+    if (!existing) {
+      throw new NotFoundException('No meal log to undo');
+    }
+
+    await this.mealLogRepository.deleteTodayForItem(
+      userId,
+      mealItemId,
+      dayStart,
+      dayEnd,
+    );
+    await this.redis.del(FitForgeCacheKeys.activeMealPlan(userId));
+    await this.dailyAggregator.rebuildForDate(userId, dayStart);
+
+    return {
+      mealPlanItemId: mealItemId,
+      status: 'pending',
+    };
+  }
+
   async replace(userId: string, mealItemId: string, dto: ReplaceMealDto) {
     const item = await this.mealItemRepository.findByIdForUser(
       mealItemId,

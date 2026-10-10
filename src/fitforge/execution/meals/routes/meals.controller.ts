@@ -44,6 +44,19 @@ export class MealsController {
       .then((data) => successResponse(data, 'Partial meal logged'));
   }
 
+  @Post(':mealId/undo')
+  @ApiOperation({
+    summary: 'Undo today\'s ate, partial, or skip log and return the meal to pending',
+  })
+  undo(
+    @CurrentUser() user: CurrentUserPayload,
+    @Param('mealId') mealId: string,
+  ) {
+    return this.mealTracking
+      .undo(user.userId, mealId)
+      .then((data) => successResponse(data, 'Meal log reverted'));
+  }
+
   @Post(':mealId/skip')
   @ApiOperation({ summary: 'Skip a planned meal' })
   skip(

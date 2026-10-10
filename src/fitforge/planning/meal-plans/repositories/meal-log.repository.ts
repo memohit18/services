@@ -24,6 +24,21 @@ export class MealLogRepository {
     });
   }
 
+  deleteTodayForItem(
+    userId: string,
+    mealPlanItemId: string,
+    dayStart: Date,
+    dayEnd: Date,
+  ) {
+    return this.prisma.mealLog.deleteMany({
+      where: {
+        userId,
+        mealPlanItemId,
+        consumedAt: { gte: dayStart, lt: dayEnd },
+      },
+    });
+  }
+
   findLatestForItemOnDay(
     userId: string,
     mealPlanItemId: string,
