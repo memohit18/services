@@ -29,7 +29,7 @@ export class ProfileController {
   @Patch('profile')
   @ApiOperation({
     summary:
-      'Edit profile (name, phone, imageUrl/avatar). Pass image URL from POST /images.',
+      'Edit profile (name, phone, avatar/imageUrl, password). Pass image URL from POST /images. Password change uses argon2 (same as auth-service).',
   })
   @ApiResponse({
     status: 200,
