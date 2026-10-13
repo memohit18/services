@@ -81,6 +81,7 @@ export class WorkoutLogRepository {
         OR: [
           { status: 'completed', setNumber: null },
           { status: 'skipped', setNumber: null },
+          { status: 'replaced', setNumber: null },
         ],
       },
     });

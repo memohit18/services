@@ -6,6 +6,7 @@ import {
 import { PrismaService } from '../../../../../prisma/prisma.service';
 import { CompleteExerciseDto } from '../dto/complete-exercise.dto';
 import { LogWorkoutSetDto } from '../dto/log-set.dto';
+import { ReplaceExerciseDto } from '../dto/replace-exercise.dto';
 import { UpdateWorkoutSetDto } from '../dto/update-set.dto';
 import { WorkoutLogRepository } from '../repositories/workout-log.repository';
 import { WorkoutSessionRepository } from '../repositories/workout-session.repository';
@@ -160,6 +161,85 @@ export class WorkoutExecutionEngineService {
       status,
       summary,
       setsLogged: sets.length,
+      analytics: detail ? this.analytics.fromSession(detail) : null,
+    };
+  }
+
+  /**
+   * Log that the user did a different exercise instead of the planned one
+   * (session log only — does not mutate the workout plan).
+   */
+  async replaceExercise(
+    userId: string,
+    exerciseId: string,
+    dto: ReplaceExerciseDto,
+  ) {
+    const session = await this.requireOpenSession(userId, dto.sessionId);
+    await this.assertExerciseInSession(userId, session.id, exerciseId);
+
+    if (session.status === 'paused') {
+      throw new BadRequestException(
+        'Resume the workout before replacing an exercise',
+      );
+    }
+
+    const existing = await this.logs.findExerciseCompletionLogs(
+      session.id,
+      exerciseId,
+    );
+    if (existing.length > 0) {
+      throw new BadRequestException('Exercise already completed or skipped');
+    }
+
+    const replacementName = dto.replacementName.trim();
+    if (!replacementName) {
+      throw new BadRequestException('replacementName is required');
+    }
+
+    if (dto.replacementExerciseId) {
+      const catalog = await this.prisma.exerciseMaster.findUnique({
+        where: { id: dto.replacementExerciseId },
+      });
+      if (!catalog) {
+        throw new NotFoundException('Replacement exercise not found');
+      }
+    }
+
+    const noteParts = [
+      `Replaced with: ${replacementName}`,
+      dto.sets != null ? `sets=${dto.sets}` : null,
+      dto.reps ? `reps=${dto.reps}` : null,
+      dto.weightKg != null ? `weightKg=${dto.weightKg}` : null,
+      dto.replacementExerciseId
+        ? `replacementExerciseId=${dto.replacementExerciseId}`
+        : null,
+      dto.notes?.trim() || null,
+    ].filter(Boolean);
+
+    const summary = await this.logs.create({
+      user: { connect: { id: userId } },
+      workoutPlanExercise: { connect: { id: exerciseId } },
+      workoutSession: { connect: { id: session.id } },
+      setNumber: null,
+      completedSets: dto.sets ?? null,
+      completedReps: dto.reps ?? null,
+      completedWeight: dto.weightKg ?? null,
+      notes: noteParts.join(' | '),
+      status: 'replaced',
+      completedAt: new Date(),
+    });
+
+    if (session.status === 'in_progress') {
+      await this.sessions.update(session.id, { status: 'partial' });
+    }
+
+    const detail = await this.sessions.findById(session.id, userId);
+    return {
+      exerciseId,
+      status: 'replaced' as const,
+      replacementName,
+      replacementExerciseId: dto.replacementExerciseId ?? null,
+      summary,
       analytics: detail ? this.analytics.fromSession(detail) : null,
     };
   }

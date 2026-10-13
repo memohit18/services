@@ -43,8 +43,14 @@ export class AiWorkoutPlanService {
         const profile = ctx.profile;
         const daysPerWeek = profile.workoutDaysPerWeek ?? 5;
         const workoutMode = profile.workoutMode ?? 'gym';
+        const equipmentAvailable = normalizeEquipmentList(
+          profile.equipmentAvailable,
+        );
+        // Home with equipment → include equipment moves; home/calisthenics
+        // without gear → bodyweight-only catalog.
         const bodyweightOnly =
-          workoutMode === 'calisthenics' || workoutMode === 'home';
+          (workoutMode === 'calisthenics' || workoutMode === 'home') &&
+          equipmentAvailable.length === 0;
         const catalog = await this.prisma.exerciseMaster.findMany({
           where: bodyweightOnly ? { equipmentRequired: false } : undefined,
           take: 80,
@@ -66,6 +72,7 @@ export class AiWorkoutPlanService {
           fitnessGoal: profile.fitnessGoal,
           experienceLevel: profile.experienceLevel ?? 'beginner',
           workoutMode,
+          equipmentAvailable,
           exerciseNames,
         });
 
@@ -156,4 +163,11 @@ export class AiWorkoutPlanService {
       data: { name, equipmentRequired: true },
     });
   }
+}
+
+function normalizeEquipmentList(value: unknown): string[] {
+  if (!Array.isArray(value)) return [];
+  return value
+    .filter((item): item is string => typeof item === 'string' && item.trim().length > 0)
+    .map((item) => item.trim());
 }

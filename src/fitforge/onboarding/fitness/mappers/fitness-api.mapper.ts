@@ -12,6 +12,18 @@ function toIsoString(value: Date | string): string {
   return new Date(value).toISOString();
 }
 
+export function normalizeEquipmentAvailable(
+  value: unknown,
+): string[] | null {
+  if (value == null) return null;
+  if (Array.isArray(value)) {
+    return value
+      .filter((item): item is string => typeof item === 'string' && item.trim().length > 0)
+      .map((item) => item.trim());
+  }
+  return null;
+}
+
 export type FitnessGoalApi = {
   id: string;
   title: string;
@@ -35,6 +47,7 @@ export type FitnessProfileApi = {
   targetBodyFatPercent: number | null;
   allergies: string | null;
   workoutMode?: string | null;
+  equipmentAvailable?: string[] | null;
   onboardingCompleted: boolean;
   physiqueGoal: FitnessGoalApi | null;
   createdAt: string;
@@ -56,6 +69,7 @@ export type FitnessProfileApiInput = {
   targetBodyFatPercent?: number | null;
   allergies?: string | null;
   workoutMode?: string | null;
+  equipmentAvailable?: string[] | null;
   onboardingCompleted?: boolean;
 };
 
@@ -147,6 +161,7 @@ export function toFitnessProfileApi(
     targetBodyFatPercent: profile.targetBodyFat,
     allergies: profile.allergies,
     workoutMode: profile.workoutMode ?? 'gym',
+    equipmentAvailable: normalizeEquipmentAvailable(profile.equipmentAvailable),
     onboardingCompleted,
     physiqueGoal: goalApi,
     createdAt: toIsoString(profile.createdAt),
@@ -174,6 +189,10 @@ export function toInternalCreateDto(
     targetBodyFat: input.targetBodyFatPercent ?? undefined,
     allergies: input.allergies ?? undefined,
     workoutMode: input.workoutMode ?? undefined,
+    equipmentAvailable:
+      input.equipmentAvailable === undefined
+        ? undefined
+        : (normalizeEquipmentAvailable(input.equipmentAvailable) ?? []),
   };
 }
 
@@ -216,6 +235,10 @@ export function toInternalUpdateDto(
   }
   if (input.workoutMode != null) {
     dto.workoutMode = input.workoutMode;
+  }
+  if (input.equipmentAvailable !== undefined) {
+    dto.equipmentAvailable =
+      normalizeEquipmentAvailable(input.equipmentAvailable) ?? [];
   }
   return dto;
 }

@@ -52,6 +52,12 @@ export class FitnessProfileResponseDto {
   @ApiPropertyOptional()
   workoutMode?: string | null;
 
+  @ApiPropertyOptional({
+    example: ['dumbbells', 'resistance_bands'],
+    isArray: true,
+  })
+  equipmentAvailable?: string[] | null;
+
   @ApiProperty()
   createdAt: Date;
 

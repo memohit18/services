@@ -20,6 +20,12 @@ function startOfUtcDay(date: Date | string = new Date()) {
   return new Date(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()));
 }
 
+function parseReplacementName(notes: string | null): string | null {
+  if (!notes) return null;
+  const match = notes.match(/Replaced with:\s*([^|]+)/i);
+  return match?.[1]?.trim() || null;
+}
+
 @Injectable()
 export class WorkoutSessionService {
   constructor(
@@ -68,6 +74,7 @@ export class WorkoutSessionService {
     if (!session) {
       return null;
     }
+    // Always load full detail (with logs) so clients get set progress.
     return this.getSessionDetail(userId, session.id);
   }
 
@@ -99,7 +106,70 @@ export class WorkoutSessionService {
       throw new NotFoundException('Workout session not found');
     }
     const analytics = this.analytics.fromSession(session);
-    return { session, analytics };
+    const exercises = this.buildSessionExercises(session);
+    return {
+      sessionId: session.id,
+      status: session.status,
+      workoutPlanDayId: session.workoutPlanDayId,
+      createdAt: session.createdAt,
+      pausedAt: session.pausedAt,
+      completedAt: session.completedAt,
+      durationMinutes: session.durationMinutes,
+      caloriesBurned: session.caloriesBurned,
+      exercises,
+      session,
+      analytics,
+    };
+  }
+
+  private buildSessionExercises(
+    session: NonNullable<
+      Awaited<ReturnType<WorkoutSessionRepository['findById']>>
+    >,
+  ) {
+    const planned = session.workoutPlanDay?.exercises ?? [];
+    const logs = session.exerciseLogs ?? [];
+
+    return planned.map((exercise) => {
+      const exerciseLogs = logs.filter(
+        (log) => log.workoutPlanExerciseId === exercise.id,
+      );
+      const setLogs = exerciseLogs
+        .filter((log) => log.setNumber != null)
+        .sort((a, b) => (a.setNumber ?? 0) - (b.setNumber ?? 0));
+      const outcome = exerciseLogs.find((log) => log.setNumber == null);
+      const status = outcome?.status ?? null;
+      const replacementName =
+        status === 'replaced'
+          ? parseReplacementName(outcome?.notes ?? null)
+          : null;
+
+      return {
+        id: exercise.id,
+        exerciseId: exercise.exerciseId,
+        name: exercise.exercise?.name ?? 'Exercise',
+        sets: exercise.sets,
+        targetSets: exercise.sets,
+        reps: exercise.reps,
+        targetReps: exercise.reps,
+        restSeconds: exercise.restSeconds,
+        sortOrder: exercise.sortOrder,
+        status,
+        completed: status === 'completed' || status === 'replaced',
+        skipped: status === 'skipped',
+        replaced: status === 'replaced',
+        replacementName,
+        notes: outcome?.notes ?? null,
+        loggedSets: setLogs.map((log) => ({
+          id: log.id,
+          setNumber: log.setNumber,
+          reps: log.completedReps != null ? Number(log.completedReps) || null : null,
+          weightKg: log.completedWeight,
+          completed: true,
+          restSeconds: log.restSeconds,
+        })),
+      };
+    });
   }
 
   async start(userId: string, dto: StartWorkoutSessionDto) {

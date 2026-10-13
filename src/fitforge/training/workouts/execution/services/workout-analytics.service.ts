@@ -74,7 +74,7 @@ export class WorkoutAnalyticsService {
       if (log.setNumber != null) {
         continue;
       }
-      if (log.status === 'completed') {
+      if (log.status === 'completed' || log.status === 'replaced') {
         completedIds.add(log.workoutPlanExerciseId);
       }
       if (log.status === 'skipped') {

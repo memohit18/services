@@ -1,6 +1,7 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { Type } from 'class-transformer';
 import {
+  IsArray,
   IsIn,
   IsInt,
   IsNumber,
@@ -15,6 +16,7 @@ import {
   EXPERIENCE_LEVELS,
   FITNESS_GOALS,
   GENDERS,
+  HOME_EQUIPMENT_OPTIONS,
   WORKOUT_MODES,
 } from '../../../../../db-schema/postgres/constants/fitforge-values';
 
@@ -116,6 +118,17 @@ export class CreateFitnessProfileDto {
   @IsOptional()
   @IsIn(WORKOUT_MODES)
   workoutMode?: string;
+
+  @ApiPropertyOptional({
+    example: ['dumbbells', 'resistance_bands'],
+    enum: HOME_EQUIPMENT_OPTIONS,
+    isArray: true,
+    description: 'Equipment available for home / hybrid training',
+  })
+  @IsOptional()
+  @IsArray()
+  @IsIn([...HOME_EQUIPMENT_OPTIONS], { each: true })
+  equipmentAvailable?: string[];
 
   @ApiPropertyOptional()
   @IsOptional()

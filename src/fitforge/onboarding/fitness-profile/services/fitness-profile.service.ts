@@ -128,6 +128,7 @@ export class FitnessProfileService {
       allergies: dto.allergies,
       budgetPreference: dto.budgetPreference ?? 'moderate',
       workoutMode: dto.workoutMode,
+      equipmentAvailable: dto.equipmentAvailable ?? undefined,
     };
   }
 

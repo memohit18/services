@@ -5,6 +5,7 @@ import type { CurrentUserPayload } from '../../../../../common/decorators/curren
 import { successResponse } from '../../../../../common/utils/api-response';
 import { CompleteExerciseDto } from '../dto/complete-exercise.dto';
 import { LogWorkoutSetDto } from '../dto/log-set.dto';
+import { ReplaceExerciseDto } from '../dto/replace-exercise.dto';
 import { UpdateWorkoutSetDto } from '../dto/update-set.dto';
 import { WorkoutExecutionEngineService } from '../services/workout-execution-engine.service';
 
@@ -58,5 +59,20 @@ export class WorkoutExecutionEngineController {
           dto.skip ? 'Exercise skipped' : 'Exercise completed',
         ),
       );
+  }
+
+  @Post('exercises/:exerciseId/replace')
+  @ApiOperation({
+    summary:
+      'Log a different exercise instead of the planned one (session log only)',
+  })
+  replace(
+    @CurrentUser() user: CurrentUserPayload,
+    @Param('exerciseId') exerciseId: string,
+    @Body() dto: ReplaceExerciseDto,
+  ) {
+    return this.execution
+      .replaceExercise(user.userId, exerciseId, dto)
+      .then((data) => successResponse(data, 'Exercise replaced'));
   }
 }
