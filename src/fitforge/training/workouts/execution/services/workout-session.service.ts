@@ -63,7 +63,21 @@ export class WorkoutSessionService {
             status: active.status,
             workoutPlanDayId: active.workoutPlanDayId,
             createdAt: active.createdAt,
+            startedAt: active.createdAt,
             pausedAt: active.pausedAt,
+            totalPausedSeconds: active.totalPausedSeconds ?? 0,
+            elapsedSeconds: this.analytics.elapsedSeconds(
+              active.createdAt,
+              active.completedAt,
+              active.totalPausedSeconds ?? 0,
+              active.pausedAt,
+            ),
+            durationSeconds: this.analytics.elapsedSeconds(
+              active.createdAt,
+              active.completedAt,
+              active.totalPausedSeconds ?? 0,
+              active.pausedAt,
+            ),
           }
         : null,
     };
@@ -105,17 +119,41 @@ export class WorkoutSessionService {
     if (!session) {
       throw new NotFoundException('Workout session not found');
     }
+    return this.toClientSession(session);
+  }
+
+  private toClientSession(
+    session: NonNullable<
+      Awaited<ReturnType<WorkoutSessionRepository['findById']>>
+    >,
+  ) {
     const analytics = this.analytics.fromSession(session);
     const exercises = this.buildSessionExercises(session);
+    const elapsedSeconds = analytics.elapsedSeconds;
     return {
       sessionId: session.id,
+      id: session.id,
       status: session.status,
       workoutPlanDayId: session.workoutPlanDayId,
       createdAt: session.createdAt,
+      startedAt: session.createdAt,
       pausedAt: session.pausedAt,
       completedAt: session.completedAt,
-      durationMinutes: session.durationMinutes,
-      caloriesBurned: session.caloriesBurned,
+      totalPausedSeconds: session.totalPausedSeconds ?? 0,
+      durationMinutes:
+        session.durationMinutes ?? analytics.workoutDurationMinutes,
+      durationSeconds: elapsedSeconds,
+      elapsedSeconds,
+      caloriesBurned:
+        session.caloriesBurned ?? analytics.caloriesBurned ?? null,
+      volumeKg: analytics.volumeKg,
+      workoutVolume: analytics.workoutVolume,
+      exercisesCompleted: analytics.exercisesCompleted,
+      exercisesSkipped: analytics.exercisesSkipped,
+      exercisesTotal: analytics.exercisesTotal,
+      setsCompleted: analytics.setsCompleted,
+      setsPlanned: analytics.setsPlanned,
+      completionPercent: analytics.completionPercent,
       exercises,
       session,
       analytics,
@@ -148,6 +186,8 @@ export class WorkoutSessionService {
         id: exercise.id,
         exerciseId: exercise.exerciseId,
         name: exercise.exercise?.name ?? 'Exercise',
+        muscleGroup: exercise.exercise?.muscleGroup ?? null,
+        difficulty: exercise.exercise?.difficulty ?? null,
         sets: exercise.sets,
         targetSets: exercise.sets,
         reps: exercise.reps,
@@ -159,7 +199,7 @@ export class WorkoutSessionService {
         skipped: status === 'skipped',
         replaced: status === 'replaced',
         replacementName,
-        notes: outcome?.notes ?? null,
+        notes: outcome?.notes ?? exercise.notes ?? null,
         loggedSets: setLogs.map((log) => ({
           id: log.id,
           setNumber: log.setNumber,
@@ -180,9 +220,9 @@ export class WorkoutSessionService {
           'A paused workout session already exists. Resume or end it first.',
         );
       }
+      const detail = await this.getSessionDetail(userId, existing.id);
       return {
-        sessionId: existing.id,
-        session: existing,
+        ...detail,
         resumed: true,
         message: 'Resumed existing in-progress session',
       };
@@ -208,13 +248,18 @@ export class WorkoutSessionService {
       totalPausedSeconds: 0,
     });
 
-    return { sessionId: session.id, session, resumed: false };
+    const detail = await this.getSessionDetail(userId, session.id);
+    return {
+      ...detail,
+      resumed: false,
+    };
   }
 
   async pause(userId: string, sessionId?: string) {
     const session = await this.requireActiveSession(userId, sessionId);
     if (session.status === 'paused') {
-      return { sessionId: session.id, session, alreadyPaused: true };
+      const detail = await this.getSessionDetail(userId, session.id);
+      return { ...detail, alreadyPaused: true };
     }
     if (session.status !== 'in_progress' && session.status !== 'partial') {
       throw new BadRequestException('Only an active session can be paused');
@@ -224,7 +269,8 @@ export class WorkoutSessionService {
       status: 'paused',
       pausedAt: new Date(),
     });
-    return { sessionId: updated.id, session: updated, alreadyPaused: false };
+    const detail = await this.getSessionDetail(userId, updated.id);
+    return { ...detail, alreadyPaused: false };
   }
 
   async resume(userId: string, sessionId?: string) {
@@ -251,7 +297,7 @@ export class WorkoutSessionService {
       pausedAt: null,
       totalPausedSeconds,
     });
-    return { sessionId: updated.id, session: updated };
+    return this.getSessionDetail(userId, updated.id);
   }
 
   async end(userId: string, dto: EndWorkoutSessionDto) {

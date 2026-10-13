@@ -3,11 +3,13 @@ import type { WorkoutLog } from '@prisma/client';
 import {
   computeWorkoutSessionAnalytics,
   effectiveDurationMinutes,
+  effectiveDurationSeconds,
 } from '../analytics/workout-session-analytics.engine';
 
 type SessionWithLogs = {
   createdAt: Date;
   completedAt: Date | null;
+  pausedAt?: Date | null;
   totalPausedSeconds: number;
   caloriesBurned: number | null;
   durationMinutes: number | null;
@@ -34,15 +36,16 @@ export class WorkoutAnalyticsService {
     const { completedIds, skippedIds } = this.exerciseOutcomes(
       session.exerciseLogs,
     );
+    const elapsedSeconds = effectiveDurationSeconds(
+      session.createdAt,
+      session.completedAt,
+      session.totalPausedSeconds ?? 0,
+      session.pausedAt ?? null,
+    );
     const duration =
-      session.durationMinutes ??
-      effectiveDurationMinutes(
-        session.createdAt,
-        session.completedAt,
-        session.totalPausedSeconds ?? 0,
-      );
+      session.durationMinutes ?? Math.max(0, Math.round(elapsedSeconds / 60));
 
-    return computeWorkoutSessionAnalytics({
+    const analytics = computeWorkoutSessionAnalytics({
       plannedExercises: (session.workoutPlanDay?.exercises ?? []).map((e) => ({
         id: e.id,
         sets: e.sets,
@@ -61,6 +64,27 @@ export class WorkoutAnalyticsService {
       completedExerciseIds: [...completedIds],
       skippedExerciseIds: [...skippedIds],
     });
+
+    return {
+      ...analytics,
+      elapsedSeconds,
+      volumeKg: analytics.workoutVolume,
+      durationSeconds: elapsedSeconds,
+    };
+  }
+
+  elapsedSeconds(
+    createdAt: Date,
+    completedAt: Date | null,
+    totalPausedSeconds: number,
+    pausedAt: Date | null = null,
+  ) {
+    return effectiveDurationSeconds(
+      createdAt,
+      completedAt,
+      totalPausedSeconds,
+      pausedAt,
+    );
   }
 
   exerciseOutcomes(

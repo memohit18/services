@@ -99,8 +99,33 @@ export function effectiveDurationMinutes(
   totalPausedSeconds: number,
   now = new Date(),
 ): number {
-  const end = completedAt ?? now;
+  return Math.max(
+    0,
+    Math.round(
+      effectiveDurationSeconds(
+        createdAt,
+        completedAt,
+        totalPausedSeconds,
+        null,
+        now,
+      ) / 60,
+    ),
+  );
+}
+
+/**
+ * Active workout seconds excluding pause time.
+ * While paused, freezes at pausedAt so the timer does not keep ticking.
+ */
+export function effectiveDurationSeconds(
+  createdAt: Date,
+  completedAt: Date | null,
+  totalPausedSeconds: number,
+  pausedAt: Date | null = null,
+  now = new Date(),
+): number {
+  const end = completedAt ?? pausedAt ?? now;
   const elapsedMs = Math.max(0, end.getTime() - createdAt.getTime());
   const activeMs = Math.max(0, elapsedMs - totalPausedSeconds * 1000);
-  return Math.max(0, Math.round(activeMs / 60_000));
+  return Math.max(0, Math.floor(activeMs / 1000));
 }
