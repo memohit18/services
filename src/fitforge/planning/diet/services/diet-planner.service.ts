@@ -8,6 +8,10 @@ import {
   resolveFoodImageUrl,
 } from '../../grocery/services/grocery.service';
 import { MealPlansService } from '../../meal-plans/services/meal-plans.service';
+import {
+  formatFoodAmountLine,
+  toMealAmountView,
+} from '../../../shared/utils/food-amount.util';
 import { DietService } from './diet.service';
 
 const MEAL_SCHEDULE: Record<string, string> = {
@@ -290,6 +294,8 @@ export class DietPlannerService {
     const carbDelta = round1(suggestion.carbs - pendingItem.carbs);
     const proteinDelta = round1(suggestion.protein - pendingItem.protein);
 
+    const suggestedAmount = toMealAmountView(suggestion, 1);
+
     return {
       mealPlanItemId: pendingItem.id,
       mealType: pendingItem.mealType,
@@ -297,20 +303,31 @@ export class DietPlannerService {
         foodId: pendingItem.foodId,
         name: pendingItem.foodName,
         quantity: pendingItem.quantity,
+        servingAmount: pendingItem.servingAmount,
+        servingUnit: pendingItem.servingUnit,
+        servingSize: pendingItem.servingSize,
+        amount: pendingItem.amount,
+        amountLabel: pendingItem.amountLabel,
         carbs: pendingItem.carbs,
         protein: pendingItem.protein,
         calories: pendingItem.calories,
         imageUrl: pendingItem.imageUrl,
-        label: `${pendingItem.foodName} ${Math.round(pendingItem.carbs)}g C`,
+        label: `${pendingItem.amountLabel} ${pendingItem.foodName} · ${Math.round(pendingItem.carbs)}g C`,
       },
       suggested: {
         foodId: suggestion.id,
         name: suggestion.name,
+        quantity: 1,
+        servingAmount: suggestedAmount.servingAmount,
+        servingUnit: suggestedAmount.servingUnit,
+        servingSize: suggestedAmount.servingSize,
+        amount: suggestedAmount.amount,
+        amountLabel: suggestedAmount.amountLabel,
         carbs: suggestion.carbs,
         protein: suggestion.protein,
         calories: suggestion.calories,
         imageUrl: resolveFoodImageUrl(suggestion),
-        label: `${suggestion.name} ${Math.round(suggestion.carbs)}g C`,
+        label: `${suggestedAmount.amountLabel} ${suggestion.name} · ${Math.round(suggestion.carbs)}g C`,
         reason:
           carbDelta < 0
             ? 'Lower glycemic load with solid protein'
@@ -348,24 +365,43 @@ function buildMealSlots(
       { calories: 0, protein: 0, carbs: 0, fats: 0 },
     );
 
-    const mappedItems = slotItems.map((item) => ({
-      id: item.id,
-      mealType,
-      foodId: item.foodId,
-      foodName: item.food.name,
-      quantity: item.quantity,
-      calories: item.calories,
-      protein: item.protein,
-      carbs: item.carbs,
-      fats: item.fats,
-      imageUrl: resolveFoodImageUrl(item.food),
-      category: item.food.category ?? null,
-      logStatus: logsByItemId.get(item.id)?.status ?? 'pending',
-    }));
+    const mappedItems = slotItems.map((item) => {
+      const amount = toMealAmountView(item.food, item.quantity);
+      return {
+        id: item.id,
+        mealType,
+        foodId: item.foodId,
+        foodName: item.food.name,
+        quantity: amount.quantity,
+        servingAmount: amount.servingAmount,
+        servingUnit: amount.servingUnit,
+        servingSize: amount.servingSize,
+        amount: amount.amount,
+        amountLabel: amount.amountLabel,
+        calories: item.calories,
+        protein: item.protein,
+        carbs: item.carbs,
+        fats: item.fats,
+        imageUrl: resolveFoodImageUrl(item.food),
+        category: item.food.category ?? null,
+        logStatus: logsByItemId.get(item.id)?.status ?? 'pending',
+      };
+    });
 
     const description =
       mappedItems.length > 0
-        ? mappedItems.map((item) => formatFoodLine(item)).join(' · ')
+        ? mappedItems
+            .map((item) =>
+              formatFoodAmountLine(item.foodName, {
+                quantity: item.quantity,
+                servingAmount: item.servingAmount,
+                servingUnit: item.servingUnit,
+                servingSize: item.servingSize,
+                amount: item.amount,
+                amountLabel: item.amountLabel,
+              }),
+            )
+            .join(' · ')
         : 'No meal planned';
 
     return {
@@ -414,12 +450,6 @@ function resolveMealTag(
     return 'SATIETY';
   }
   return 'BALANCED';
-}
-
-function formatFoodLine(item: { quantity: number; foodName: string }) {
-  return item.quantity === 1
-    ? item.foodName
-    : `${item.quantity}× ${item.foodName}`;
 }
 
 function resolveSlotStatus(statuses: string[]) {

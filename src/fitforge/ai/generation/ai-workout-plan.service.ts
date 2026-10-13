@@ -42,17 +42,30 @@ export class AiWorkoutPlanService {
 
         const profile = ctx.profile;
         const daysPerWeek = profile.workoutDaysPerWeek ?? 5;
+        const workoutMode = profile.workoutMode ?? 'gym';
+        const bodyweightOnly =
+          workoutMode === 'calisthenics' || workoutMode === 'home';
         const catalog = await this.prisma.exerciseMaster.findMany({
+          where: bodyweightOnly ? { equipmentRequired: false } : undefined,
           take: 80,
           orderBy: { name: 'asc' },
           select: { name: true, muscleGroup: true },
         });
-        const exerciseNames = catalog.map((e) => e.name);
+        // Fall back to full catalog if bodyweight-only set is too thin.
+        const resolvedCatalog =
+          bodyweightOnly && catalog.length < 12
+            ? await this.prisma.exerciseMaster.findMany({
+                take: 80,
+                orderBy: { name: 'asc' },
+                select: { name: true, muscleGroup: true },
+              })
+            : catalog;
+        const exerciseNames = resolvedCatalog.map((e) => e.name);
         const prompt = buildWorkoutPlanPrompt({
           daysPerWeek,
           fitnessGoal: profile.fitnessGoal,
           experienceLevel: profile.experienceLevel ?? 'beginner',
-          workoutMode: profile.workoutMode ?? 'gym',
+          workoutMode,
           exerciseNames,
         });
 

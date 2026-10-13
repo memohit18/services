@@ -4,6 +4,7 @@ import type {
   DietAiMetadata,
   MealDistribution,
 } from '../../../ai/shared/diet-targets.types';
+import { toMealAmountView } from '../../../shared/utils/food-amount.util';
 
 /** Legacy targets block — keep field names stable for existing clients. */
 export class DietTargetsResponseDto {
@@ -36,8 +37,35 @@ export class DietMealItemResponseDto {
   @ApiPropertyOptional()
   foodName?: string;
 
-  @ApiProperty()
+  @ApiProperty({ description: 'Servings relative to food catalog portion' })
   quantity: number;
+
+  @ApiPropertyOptional({
+    example: 240,
+    description: 'Base catalog portion size',
+  })
+  servingAmount?: number;
+
+  @ApiPropertyOptional({
+    example: 'ml',
+    description: 'Unit for servingAmount / amount (g | ml | piece | tbsp | serving)',
+  })
+  servingUnit?: string;
+
+  @ApiPropertyOptional({ example: '1 cup (240 ml)' })
+  servingSize?: string | null;
+
+  @ApiPropertyOptional({
+    example: 240,
+    description: 'Total amount = quantity × servingAmount',
+  })
+  amount?: number;
+
+  @ApiPropertyOptional({
+    example: '240 ml',
+    description: 'Display label for portion (e.g. 240 ml Milk, 150 g Poha)',
+  })
+  amountLabel?: string;
 
   @ApiProperty()
   calories: number;
@@ -171,18 +199,28 @@ export function toGeneratedDietResponse(result: {
       version: result.mealPlan.version,
       planType: result.mealPlan.planType,
       status: result.mealPlan.status,
-      items: result.mealPlan.items.map((item) => ({
-        id: item.id,
-        dayNumber: item.dayNumber,
-        mealType: item.mealType,
-        foodId: item.foodId,
-        foodName: item.food?.name,
-        quantity: item.quantity,
-        calories: item.calories,
-        protein: item.protein,
-        carbs: item.carbs,
-        fats: item.fats,
-      })),
+      items: result.mealPlan.items.map((item) => {
+        const amount = item.food
+          ? toMealAmountView(item.food, item.quantity)
+          : null;
+        return {
+          id: item.id,
+          dayNumber: item.dayNumber,
+          mealType: item.mealType,
+          foodId: item.foodId,
+          foodName: item.food?.name,
+          quantity: item.quantity,
+          servingAmount: amount?.servingAmount,
+          servingUnit: amount?.servingUnit,
+          servingSize: amount?.servingSize ?? item.food?.servingSize ?? null,
+          amount: amount?.amount,
+          amountLabel: amount?.amountLabel,
+          calories: item.calories,
+          protein: item.protein,
+          carbs: item.carbs,
+          fats: item.fats,
+        };
+      }),
     },
   };
 }

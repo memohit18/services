@@ -40,6 +40,25 @@ export class CreateFoodDto {
   @IsString()
   servingSize?: string;
 
+  @ApiPropertyOptional({
+    example: 100,
+    description: 'Numeric base portion (e.g. 100 for 100g, 240 for 240ml)',
+  })
+  @IsOptional()
+  @Type(() => Number)
+  @IsNumber()
+  @Min(0)
+  servingAmount?: number;
+
+  @ApiPropertyOptional({
+    example: 'g',
+    description: 'g | ml | piece | tbsp | serving',
+  })
+  @IsOptional()
+  @IsString()
+  @IsIn(['g', 'ml', 'piece', 'tbsp', 'serving'])
+  servingUnit?: string;
+
   @ApiProperty({ example: 165 })
   @Type(() => Number)
   @IsInt()

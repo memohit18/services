@@ -94,6 +94,15 @@ export class CreateFitnessProfileApiDto {
   @MaxLength(1000)
   allergies?: string | null;
 
+  @ApiPropertyOptional({
+    example: 'calisthenics',
+    enum: ['gym', 'home', 'calisthenics'],
+    description: 'Training style used when generating the workout plan',
+  })
+  @IsOptional()
+  @IsIn(['gym', 'home', 'calisthenics'])
+  workoutMode?: string;
+
   @ApiPropertyOptional({ example: true })
   @IsOptional()
   @IsBoolean()

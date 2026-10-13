@@ -40,6 +40,19 @@ export class CreateCustomFoodDto {
   @IsString()
   servingSize?: string;
 
+  @ApiPropertyOptional({ example: 150 })
+  @IsOptional()
+  @Type(() => Number)
+  @IsNumber()
+  @Min(0)
+  servingAmount?: number;
+
+  @ApiPropertyOptional({ example: 'g' })
+  @IsOptional()
+  @IsString()
+  @IsIn(['g', 'ml', 'piece', 'tbsp', 'serving'])
+  servingUnit?: string;
+
   @ApiProperty({ example: 320 })
   @Type(() => Number)
   @IsInt()

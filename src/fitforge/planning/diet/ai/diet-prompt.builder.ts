@@ -4,6 +4,9 @@ export type DietPromptFood = {
   protein: number;
   carbs: number;
   fats: number;
+  servingAmount?: number;
+  servingUnit?: string;
+  servingSize?: string | null;
 };
 
 export type DietPromptContext = {
@@ -29,10 +32,13 @@ export type DietPromptContext = {
 export function buildDietPrompt(ctx: DietPromptContext): string {
   const catalog = ctx.catalogFoods
     .slice(0, 120)
-    .map(
-      (f) =>
-        `- ${f.name} (${f.calories} kcal, P${f.protein}/C${f.carbs}/F${f.fats})`,
-    )
+    .map((f) => {
+      const portion =
+        f.servingAmount && f.servingUnit
+          ? `${f.servingAmount} ${f.servingUnit}`
+          : f.servingSize || '1 serving';
+      return `- ${f.name} [portion ${portion}] (${f.calories} kcal, P${f.protein}/C${f.carbs}/F${f.fats})`;
+    })
     .join('\n');
 
   return `You are FitForge nutrition AI. Return JSON only. No markdown.
@@ -85,5 +91,6 @@ Rules:
 - Prefer favorites and available foods.
 - Never include restricted foods.
 - foodName MUST match the catalog exactly (case-insensitive match is ok).
-- quantity is servings relative to catalog serving macros.`;
+- quantity is servings relative to the catalog portion shown in brackets (e.g. Milk portion 240 ml → quantity 1 means 240 ml; quantity 1.5 means 360 ml).
+- Prefer realistic portions (typically quantity between 0.5 and 2).`;
 }

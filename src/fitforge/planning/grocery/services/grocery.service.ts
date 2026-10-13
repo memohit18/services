@@ -151,7 +151,9 @@ export class GroceryService {
           foodId: item.foodId,
           name: item.food.name,
           quantity: item.quantity,
-          unit: item.food.servingSize ?? 'serving',
+          unit: item.food.servingUnit
+            ? `${item.food.servingAmount ?? 1} ${item.food.servingUnit}`
+            : (item.food.servingSize ?? 'serving'),
           imageUrl: resolveFoodImageUrl(item.food),
         });
       }

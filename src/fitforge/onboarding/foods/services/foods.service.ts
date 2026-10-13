@@ -148,6 +148,8 @@ export class FoodsService {
       category: transformFoodCategoryInput(dto.category),
       dietType: dto.dietType ? normalizeDietType(dto.dietType) : undefined,
       servingSize: dto.servingSize,
+      servingAmount: dto.servingAmount,
+      servingUnit: dto.servingUnit,
       calories: dto.calories,
       protein: dto.protein,
       carbs: dto.carbs,
@@ -177,6 +179,12 @@ export class FoodsService {
     }
     if (dto.servingSize !== undefined) {
       data.servingSize = dto.servingSize;
+    }
+    if (dto.servingAmount !== undefined) {
+      data.servingAmount = dto.servingAmount;
+    }
+    if (dto.servingUnit !== undefined) {
+      data.servingUnit = dto.servingUnit;
     }
     if (dto.calories !== undefined) {
       data.calories = dto.calories;

@@ -16,6 +16,12 @@ export class FoodResponseDto {
   @ApiPropertyOptional()
   servingSize?: string | null;
 
+  @ApiPropertyOptional({ example: 240 })
+  servingAmount?: number | null;
+
+  @ApiPropertyOptional({ example: 'ml' })
+  servingUnit?: string | null;
+
   @ApiProperty()
   calories: number;
 

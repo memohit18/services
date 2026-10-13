@@ -269,12 +269,15 @@ export class DietService {
         }
         return true;
       })
-      .map(({ name, calories, protein, carbs, fats }) => ({
-        name,
-        calories,
-        protein,
-        carbs,
-        fats,
+      .map((f) => ({
+        name: f.name,
+        calories: f.calories,
+        protein: f.protein,
+        carbs: f.carbs,
+        fats: f.fats,
+        servingAmount: f.servingAmount ?? undefined,
+        servingUnit: f.servingUnit ?? undefined,
+        servingSize: f.servingSize,
       }));
 
     if (filteredCatalog.length === 0) {

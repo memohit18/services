@@ -139,6 +139,13 @@ export type WorkoutPlanPromptInput = {
 };
 
 export function buildWorkoutPlanPrompt(input: WorkoutPlanPromptInput): string {
+  const modeGuidance =
+    input.workoutMode === 'calisthenics'
+      ? 'Mode is calisthenics: use bodyweight / minimal-equipment moves only (push-ups, pull-ups, dips, squats, lunges, core). No barbell or machine lifts.'
+      : input.workoutMode === 'home'
+        ? 'Mode is home: prefer bodyweight and light/dumbbell-friendly moves; avoid gym machines.'
+        : 'Mode is gym: free weights and machines are allowed.';
+
   return `Generate a ${input.daysPerWeek}-day workout plan. Return JSON only.
 
 User:
@@ -146,6 +153,8 @@ Goal: ${input.fitnessGoal}
 Experience: ${input.experienceLevel}
 Workout mode: ${input.workoutMode}
 Days per week: ${input.daysPerWeek}
+
+${modeGuidance}
 
 Available exercises (prefer these names):
 ${input.exerciseNames.join(', ')}

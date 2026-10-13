@@ -34,6 +34,7 @@ export type FitnessProfileApi = {
   targetWeightKg: number | null;
   targetBodyFatPercent: number | null;
   allergies: string | null;
+  workoutMode?: string | null;
   onboardingCompleted: boolean;
   physiqueGoal: FitnessGoalApi | null;
   createdAt: string;
@@ -54,6 +55,7 @@ export type FitnessProfileApiInput = {
   targetWeightKg?: number | null;
   targetBodyFatPercent?: number | null;
   allergies?: string | null;
+  workoutMode?: string | null;
   onboardingCompleted?: boolean;
 };
 
@@ -144,6 +146,7 @@ export function toFitnessProfileApi(
     targetWeightKg: profile.targetWeightKg,
     targetBodyFatPercent: profile.targetBodyFat,
     allergies: profile.allergies,
+    workoutMode: profile.workoutMode ?? 'gym',
     onboardingCompleted,
     physiqueGoal: goalApi,
     createdAt: toIsoString(profile.createdAt),
@@ -170,6 +173,7 @@ export function toInternalCreateDto(
     targetWeightKg: input.targetWeightKg ?? undefined,
     targetBodyFat: input.targetBodyFatPercent ?? undefined,
     allergies: input.allergies ?? undefined,
+    workoutMode: input.workoutMode ?? undefined,
   };
 }
 
@@ -209,6 +213,9 @@ export function toInternalUpdateDto(
   }
   if (input.allergies !== undefined) {
     dto.allergies = input.allergies ?? undefined;
+  }
+  if (input.workoutMode != null) {
+    dto.workoutMode = input.workoutMode;
   }
   return dto;
 }

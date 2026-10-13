@@ -11,6 +11,7 @@ import {
   RedisService,
 } from '../../../infrastructure/redis/redis.service';
 import { DailyAggregatorService } from '../../../tracking/checkins/services/daily-aggregator.service';
+import { toMealAmountView } from '../../../shared/utils/food-amount.util';
 import { ReplaceMealDto } from '../dto/replace-meal.dto';
 import { MealItemRepository } from '../repositories/meal-item.repository';
 import { MealLogRepository } from '../repositories/meal-log.repository';
@@ -92,19 +93,30 @@ export class MealTrackingService {
           log?.status === 'partial';
         const consumedQuantity = logged ? (log?.consumedQuantity ?? 1) : null;
         const scale = consumedQuantity ?? 1;
+        const amount = toMealAmountView(item.food, item.quantity);
+        const consumedAmount =
+          consumedQuantity != null
+            ? toMealAmountView(item.food, item.quantity * consumedQuantity)
+            : null;
         return {
           id: item.id,
           mealType: item.mealType,
           foodId: item.foodId,
           foodName: item.food.name,
           quantity: item.quantity,
-          servingSize: item.food.servingSize ?? null,
+          servingAmount: amount.servingAmount,
+          servingUnit: amount.servingUnit,
+          servingSize: amount.servingSize,
+          amount: amount.amount,
+          amountLabel: amount.amountLabel,
           calories: item.calories,
           protein: item.protein,
           carbs: item.carbs,
           fats: item.fats,
           status: log?.status ?? 'pending',
           consumedQuantity,
+          consumedAmount: consumedAmount?.amount ?? null,
+          consumedAmountLabel: consumedAmount?.amountLabel ?? null,
           actualCalories: logged
             ? (log?.actualCalories ?? Math.round(item.calories * scale))
             : null,
@@ -341,18 +353,8 @@ export class MealTrackingService {
 
     const calories = Math.round(replacement.calories * quantity);
     const protein = Math.round(replacement.protein * quantity * 10) / 10;
-    const carbs = Math.round(replacement.carbs * quantity * 10) / 10;
-    const fats = Math.round(replacement.fats * quantity * 10) / 10;
 
-    await this.mealItemRepository.update(mealItemId, {
-      food: { connect: { id: replacement.id } },
-      quantity,
-      calories,
-      protein,
-      carbs,
-      fats,
-    });
-
+    // Log-only for today — do not mutate MealPlanItem or the diet plan.
     const { dayStart, dayEnd } = this.todayBounds();
     const log = await this.mealLogRepository.upsertTodayStatus({
       userId,
@@ -362,12 +364,11 @@ export class MealTrackingService {
       replacementFoodId: replacement.id,
       actualCalories: calories,
       actualProtein: protein,
-      consumedQuantity: 1,
+      consumedQuantity: quantity,
       dayStart,
       dayEnd,
     });
 
-    await this.redis.del(FitForgeCacheKeys.activeMealPlan(userId));
     await this.dailyAggregator.rebuildForDate(userId, dayStart);
     return log;
   }
