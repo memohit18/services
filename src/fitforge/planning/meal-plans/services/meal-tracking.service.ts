@@ -86,17 +86,32 @@ export class MealTrackingService {
       mealPlanId: plan.id,
       meals: items.map((item) => {
         const log = logByItem.get(item.id);
+        const logged =
+          log?.status === 'completed' ||
+          log?.status === 'replaced' ||
+          log?.status === 'partial';
+        const consumedQuantity = logged ? (log?.consumedQuantity ?? 1) : null;
+        const scale = consumedQuantity ?? 1;
         return {
           id: item.id,
           mealType: item.mealType,
           foodId: item.foodId,
           foodName: item.food.name,
           quantity: item.quantity,
+          servingSize: item.food.servingSize ?? null,
           calories: item.calories,
           protein: item.protein,
           carbs: item.carbs,
           fats: item.fats,
           status: log?.status ?? 'pending',
+          consumedQuantity,
+          actualCalories: logged
+            ? (log?.actualCalories ?? Math.round(item.calories * scale))
+            : null,
+          actualProtein: logged
+            ? (log?.actualProtein ??
+              Math.round(item.protein * scale * 10) / 10)
+            : null,
           logId: log?.id ?? null,
           replacementFoodId: log?.replacementFoodId ?? null,
           replacementFoodName: log?.replacementFood?.name ?? null,
@@ -135,11 +150,12 @@ export class MealTrackingService {
         meal.status === 'partial'
       ) {
         completed += 1;
-        // partial uses planned macros as upper bound; actuals live on MealLog
-        calories += meal.calories;
-        protein += meal.protein;
-        carbs += meal.carbs;
-        fats += meal.fats;
+        const scale = meal.consumedQuantity ?? 1;
+        calories += meal.actualCalories ?? Math.round(meal.calories * scale);
+        protein +=
+          meal.actualProtein ?? Math.round(meal.protein * scale * 10) / 10;
+        carbs += Math.round(meal.carbs * scale * 10) / 10;
+        fats += Math.round(meal.fats * scale * 10) / 10;
       }
     }
 
