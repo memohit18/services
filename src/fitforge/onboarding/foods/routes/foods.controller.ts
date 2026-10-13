@@ -22,6 +22,7 @@ import { RolesGuard } from '../../../../common/guards/roles.guard';
 import { successResponse } from '../../../../common/utils/api-response';
 import { CreateCustomFoodDto } from '../dto/create-custom-food.dto';
 import { CreateFoodDto } from '../dto/create-food.dto';
+import { EstimateFoodNutritionDto } from '../dto/estimate-food-nutrition.dto';
 import { FoodResponseDto } from '../dto/food-response.dto';
 import { ListFoodsQueryDto } from '../dto/list-foods-query.dto';
 import { UpdateFoodDto } from '../dto/update-food.dto';
@@ -39,6 +40,20 @@ export class FoodsController {
     return this.foodsService
       .getCategories()
       .then((data) => successResponse(data, 'Food categories retrieved'));
+  }
+
+  @Post('estimate-nutrition')
+  @ApiOperation({
+    summary:
+      'Estimate calories/macros for a free-text food description (user confirms before save)',
+  })
+  estimateNutrition(
+    @CurrentUser() user: CurrentUserPayload,
+    @Body() dto: EstimateFoodNutritionDto,
+  ) {
+    return this.foodsService
+      .estimateNutrition(user.userId, dto)
+      .then((data) => successResponse(data, 'Nutrition estimate ready'));
   }
 
   @Post('custom')

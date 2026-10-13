@@ -214,6 +214,9 @@ export class DietService {
             carbs: true,
             fats: true,
             dietType: true,
+            servingSize: true,
+            servingAmount: true,
+            servingUnit: true,
           },
         }),
       ]);
