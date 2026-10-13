@@ -1,9 +1,10 @@
 /**
- * One-shot smoke test for Gemini + Grok via shared LlmClient.
+ * One-shot smoke test for Gemini + Grok + Cursor via shared LlmClient.
  * Usage: dotenv -e .env -- ts-node --transpile-only scripts/test-llm-providers.ts
  */
 import { LlmClient } from '../src/common/ai/llm.client';
 import { loadLlmConfigFromEnv, resolveXaiApiKey, isGroqApiKey } from '../src/common/ai/llm.config';
+import { CursorProvider } from '../src/common/ai/providers/cursor.provider';
 import { GeminiProvider } from '../src/common/ai/providers/gemini.provider';
 import { GrokProvider } from '../src/common/ai/providers/grok.provider';
 
@@ -45,6 +46,14 @@ async function main() {
   console.log(`gemini model: ${config.gemini.model}`);
   console.log(`xai key: ${keyFormatHint(config.grok.apiKey)} (source: ${xaiResolved.source ?? 'none'})`);
   console.log(`grok model: ${config.grok.model}`);
+  console.log(
+    `cursor key: ${config.cursor.apiKey ? `set (len ${config.cursor.apiKey.length})` : 'not set'}`,
+  );
+  console.log(
+    `cursor model: ${config.cursor.model} (runtime=${config.cursor.runtime}${
+      config.cursor.baseUrl ? `, baseUrl=${config.cursor.baseUrl}` : ''
+    })`,
+  );
   if (groqKeyInGrokSlot && process.env.XAI_API_KEY?.trim()) {
     console.log('note: GROK_API_KEY holds a Groq key — using XAI_API_KEY instead');
   } else if (groqKeyInGrokSlot) {
@@ -54,6 +63,7 @@ async function main() {
 
   const gemini = new GeminiProvider(config.gemini);
   const grok = new GrokProvider(config.grok);
+  const cursor = new CursorProvider(config.cursor);
 
   const results: Array<{ name: string; ok: boolean; detail: string }> = [];
 
@@ -87,6 +97,24 @@ async function main() {
       name: 'grok',
       ok: false,
       detail: 'GROK_API_KEY / XAI_API_KEY not set — skipped',
+    });
+  }
+
+  if (cursor.isConfigured()) {
+    const model = cursor.getModels()[0];
+    const result = await testProvider('cursor', () =>
+      cursor.generate({
+        prompt: PROMPT,
+        model,
+        responseMimeType: 'application/json',
+      }),
+    );
+    results.push({ name: `cursor (${model})`, ...result });
+  } else {
+    results.push({
+      name: 'cursor',
+      ok: false,
+      detail: 'CURSOR_API_KEY not set — skipped',
     });
   }
 

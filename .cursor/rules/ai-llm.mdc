@@ -19,9 +19,9 @@ All LLM calls go through `src/common/ai/` — not ad-hoc `@google/genai` or raw 
 
 ## Provider failover
 
-`LlmClient` tries providers in `LLM_PROVIDER_ORDER` (default `gemini,grok`). Within each provider it retries with backoff, then tries fallback models, then switches to the next provider.
+`LlmClient` tries providers in `LLM_PROVIDER_ORDER` (default `gemini,grok,cursor`). Within each provider it retries with backoff, then tries fallback models, then switches to the next provider.
 
-Set at least one key: `GEMINI_API_KEY` and/or `GROK_API_KEY`.
+Set at least one key: `GEMINI_API_KEY`, `GROK_API_KEY`/`XAI_API_KEY`, and/or `CURSOR_API_KEY`.
 
 ## When adding AI features
 
@@ -39,4 +39,4 @@ Set at least one key: `GEMINI_API_KEY` and/or `GROK_API_KEY`.
 
 ## Env vars (names only in docs)
 
-`GEMINI_API_KEY`, `XAI_API_KEY` (preferred for Grok), `GROK_API_KEY` (legacy alias — not Groq `gsk_` keys), `LLM_PROVIDER_ORDER`, `LLM_MAX_RETRIES`, `GEMINI_MODEL`, `GROK_MODEL`, plus provider-specific fallbacks. See `.env.example`.
+`GEMINI_API_KEY`, `XAI_API_KEY` (preferred for Grok), `GROK_API_KEY` (legacy alias — not Groq `gsk_` keys), `CURSOR_API_KEY`, `CURSOR_MODEL`, `CURSOR_BASE_URL` (optional OpenAI-compatible proxy), `CURSOR_RUNTIME`, `LLM_PROVIDER_ORDER`, `LLM_MAX_RETRIES`, `GEMINI_MODEL`, `GROK_MODEL`, plus provider-specific fallbacks. See `.env.example`.

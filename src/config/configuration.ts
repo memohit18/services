@@ -31,7 +31,7 @@ export default () => ({
     pythonBin: process.env.PYTHON_BIN,
   },
   llm: {
-    providerOrder: process.env.LLM_PROVIDER_ORDER ?? 'gemini,grok',
+    providerOrder: process.env.LLM_PROVIDER_ORDER ?? 'gemini,grok,cursor',
     maxRetries: parseInt(
       process.env.LLM_MAX_RETRIES ?? process.env.GEMINI_MAX_RETRIES ?? '3',
       10,
@@ -46,6 +46,13 @@ export default () => ({
       model: process.env.GROK_MODEL,
       fallbackModels: process.env.GROK_FALLBACK_MODELS,
       baseUrl: process.env.GROK_BASE_URL,
+    },
+    cursor: {
+      apiKey: process.env.CURSOR_API_KEY,
+      model: process.env.CURSOR_MODEL,
+      fallbackModels: process.env.CURSOR_FALLBACK_MODELS,
+      baseUrl: process.env.CURSOR_BASE_URL,
+      runtime: process.env.CURSOR_RUNTIME,
     },
   },
 });

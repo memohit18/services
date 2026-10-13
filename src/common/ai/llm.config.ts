@@ -1,5 +1,7 @@
 import type { ConfigService } from '@nestjs/config';
 import {
+  DEFAULT_CURSOR_FALLBACK_MODELS,
+  DEFAULT_CURSOR_MODEL,
   DEFAULT_GEMINI_FALLBACK_MODELS,
   DEFAULT_GEMINI_MODEL,
   DEFAULT_GROK_BASE_URL,
@@ -19,9 +21,15 @@ function parseCsv(value: string | undefined): string[] {
   );
 }
 
+const VALID_PROVIDERS: ReadonlySet<string> = new Set([
+  'gemini',
+  'grok',
+  'cursor',
+]);
+
 function parseProviderOrder(value: string | undefined): LlmProvider[] {
   const parsed = parseCsv(value).filter(
-    (entry): entry is LlmProvider => entry === 'gemini' || entry === 'grok',
+    (entry): entry is LlmProvider => VALID_PROVIDERS.has(entry),
   );
 
   return parsed.length > 0 ? parsed : [...DEFAULT_LLM_PROVIDER_ORDER];
@@ -76,7 +84,15 @@ export function loadLlmConfigFromEnv(
       ? parseCsv(env.GROK_FALLBACK_MODELS)
       : [...DEFAULT_GROK_FALLBACK_MODELS];
 
+  const cursorModel = env.CURSOR_MODEL ?? DEFAULT_CURSOR_MODEL;
+  const cursorFallbacks =
+    parseCsv(env.CURSOR_FALLBACK_MODELS).length > 0
+      ? parseCsv(env.CURSOR_FALLBACK_MODELS)
+      : [...DEFAULT_CURSOR_FALLBACK_MODELS];
+
   const { apiKey: grokApiKey } = resolveXaiApiKey(env);
+  const cursorRuntime =
+    env.CURSOR_RUNTIME?.trim().toLowerCase() === 'cloud' ? 'cloud' : 'local';
 
   return {
     providerOrder: parseProviderOrder(env.LLM_PROVIDER_ORDER),
@@ -95,6 +111,13 @@ export function loadLlmConfigFromEnv(
       fallbackModels: uniqueModels(grokModel, grokFallbacks).slice(1),
       baseUrl: env.GROK_BASE_URL ?? DEFAULT_GROK_BASE_URL,
     },
+    cursor: {
+      apiKey: env.CURSOR_API_KEY?.trim(),
+      model: cursorModel,
+      fallbackModels: uniqueModels(cursorModel, cursorFallbacks).slice(1),
+      baseUrl: env.CURSOR_BASE_URL?.trim() || undefined,
+      runtime: cursorRuntime,
+    },
   };
 }
 
@@ -109,6 +132,11 @@ export function loadLlmConfigFromNestConfig(config: ConfigService): LlmConfig {
     GROK_MODEL: config.get<string>('GROK_MODEL'),
     GROK_FALLBACK_MODELS: config.get<string>('GROK_FALLBACK_MODELS'),
     GROK_BASE_URL: config.get<string>('GROK_BASE_URL'),
+    CURSOR_API_KEY: config.get<string>('CURSOR_API_KEY'),
+    CURSOR_MODEL: config.get<string>('CURSOR_MODEL'),
+    CURSOR_FALLBACK_MODELS: config.get<string>('CURSOR_FALLBACK_MODELS'),
+    CURSOR_BASE_URL: config.get<string>('CURSOR_BASE_URL'),
+    CURSOR_RUNTIME: config.get<string>('CURSOR_RUNTIME'),
     LLM_PROVIDER_ORDER: config.get<string>('LLM_PROVIDER_ORDER'),
     LLM_MAX_RETRIES: config.get<string>('LLM_MAX_RETRIES'),
   });

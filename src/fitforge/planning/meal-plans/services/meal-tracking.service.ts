@@ -115,6 +115,7 @@ export class MealTrackingService {
           logId: log?.id ?? null,
           replacementFoodId: log?.replacementFoodId ?? null,
           replacementFoodName: log?.replacementFood?.name ?? null,
+          originalFoodName: log?.originalFood?.name ?? null,
         };
       }),
     };
@@ -185,6 +186,65 @@ export class MealTrackingService {
       mealsTotal: today.meals.length,
       mealsCompleted: completed,
     };
+  }
+
+  /**
+   * Add an off-plan meal the user already ate: create today's plan item with
+   * macros scaled by quantity, then mark it completed (consumedQuantity = 1
+   * so calories are not scaled twice).
+   */
+  async logEaten(
+    userId: string,
+    opts: {
+      foodId: string;
+      mealType: string;
+      quantity: number;
+      notes?: string;
+    },
+  ) {
+    const quantity = Math.round(opts.quantity * 100) / 100;
+    if (!(quantity >= 0.1)) {
+      throw new BadRequestException('quantity must be at least 0.1');
+    }
+
+    const plan = await this.mealPlanRepository.findActive(userId);
+    if (!plan) {
+      throw new NotFoundException('No active meal plan');
+    }
+
+    const food = await this.prisma.foodMaster.findUnique({
+      where: { id: opts.foodId },
+    });
+    if (!food) {
+      throw new NotFoundException('Food not found');
+    }
+
+    const date = startOfUtcDay();
+    const dayNumber = resolveDayNumber(plan, date);
+    const calories = Math.round(food.calories * quantity);
+    const protein = Math.round(food.protein * quantity * 10) / 10;
+    const carbs = Math.round(food.carbs * quantity * 10) / 10;
+    const fats = Math.round(food.fats * quantity * 10) / 10;
+
+    const item = await this.mealItemRepository.create({
+      mealPlan: { connect: { id: plan.id } },
+      food: { connect: { id: food.id } },
+      dayNumber,
+      mealType: opts.mealType,
+      quantity,
+      calories,
+      protein,
+      carbs,
+      fats,
+    });
+    await this.redis.del(FitForgeCacheKeys.activeMealPlan(userId));
+
+    // Item macros already include quantity; complete at 1 so nutrition summary
+    // does not scale carbs/fats again via consumedQuantity.
+    return this.complete(userId, item.id, {
+      consumedQuantity: 1,
+      notes: opts.notes,
+    });
   }
 
   async complete(

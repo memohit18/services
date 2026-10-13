@@ -5,6 +5,7 @@ import type { CurrentUserPayload } from '../../../../common/decorators/current-u
 import { successResponse } from '../../../../common/utils/api-response';
 import { MealTrackingService } from '../../../planning/meal-plans/services/meal-tracking.service';
 import { CompleteMealDto } from '../dto/complete-meal.dto';
+import { LogEatenMealDto } from '../dto/log-eaten-meal.dto';
 import { PartialMealDto } from '../dto/partial-meal.dto';
 import { ReplaceMealExecutionDto } from '../dto/replace-meal-execution.dto';
 
@@ -13,6 +14,25 @@ import { ReplaceMealExecutionDto } from '../dto/replace-meal-execution.dto';
 @Controller('meals')
 export class MealsController {
   constructor(private readonly mealTracking: MealTrackingService) {}
+
+  @Post('log-eaten')
+  @ApiOperation({
+    summary:
+      'Log an off-plan meal you already ate (adds to today + marks completed; quantity scales macros)',
+  })
+  logEaten(
+    @CurrentUser() user: CurrentUserPayload,
+    @Body() dto: LogEatenMealDto,
+  ) {
+    return this.mealTracking
+      .logEaten(user.userId, {
+        foodId: dto.foodId,
+        mealType: dto.mealType,
+        quantity: dto.quantity,
+        notes: dto.notes,
+      })
+      .then((data) => successResponse(data, 'Eaten meal logged'));
+  }
 
   @Post(':mealId/complete')
   @ApiOperation({ summary: 'Mark meal as completed (updates nutrition + daily score)' })

@@ -1,9 +1,11 @@
 import { loadLlmConfigFromEnv } from './llm.config';
 import {
+  DEFAULT_CURSOR_MODEL,
   DEFAULT_GEMINI_MODEL,
   DEFAULT_GROK_MODEL,
   DEFAULT_LLM_PROVIDER_ORDER,
 } from './llm.constants';
+import { CursorProvider } from './providers/cursor.provider';
 import { GeminiProvider } from './providers/gemini.provider';
 import { GrokProvider } from './providers/grok.provider';
 import { isQuotaExceededError, isRetryableLlmError, retryDelayMs, sleep } from './retry.util';
@@ -218,6 +220,7 @@ export class LlmClient {
     const byName: Record<LlmProvider, LlmProviderAdapter> = {
       gemini: new GeminiProvider(this.config.gemini),
       grok: new GrokProvider(this.config.grok),
+      cursor: new CursorProvider(this.config.cursor),
     };
 
     return this.config.providerOrder.map((name) => byName[name]);
@@ -231,7 +234,9 @@ export class LlmClient {
     }
 
     const primary = this.config.providerOrder[0];
-    return primary === 'grok' ? DEFAULT_GROK_MODEL : DEFAULT_GEMINI_MODEL;
+    if (primary === 'grok') return DEFAULT_GROK_MODEL;
+    if (primary === 'cursor') return DEFAULT_CURSOR_MODEL;
+    return DEFAULT_GEMINI_MODEL;
   }
 
   private getNextConfiguredProvider(

@@ -1,4 +1,4 @@
-export type LlmProvider = 'gemini' | 'grok';
+export type LlmProvider = 'gemini' | 'grok' | 'cursor';
 
 export type LlmGenerateOptions = {
   prompt: string;
@@ -27,11 +27,19 @@ export type GrokProviderConfig = LlmProviderConfig & {
   baseUrl: string;
 };
 
+export type CursorProviderConfig = LlmProviderConfig & {
+  /** When set, use OpenAI-compatible POST {baseUrl}/chat/completions */
+  baseUrl?: string;
+  /** local = Agent.prompt against temp cwd; cloud = Cursor cloud agent */
+  runtime: 'local' | 'cloud';
+};
+
 export type LlmConfig = {
   providerOrder: LlmProvider[];
   maxRetries: number;
   gemini: LlmProviderConfig;
   grok: GrokProviderConfig;
+  cursor: CursorProviderConfig;
 };
 
 export type LlmLogLevel = 'warn' | 'error';
