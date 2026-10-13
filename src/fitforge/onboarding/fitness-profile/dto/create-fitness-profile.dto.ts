@@ -16,9 +16,9 @@ import {
   EXPERIENCE_LEVELS,
   FITNESS_GOALS,
   GENDERS,
-  HOME_EQUIPMENT_OPTIONS,
   WORKOUT_MODES,
 } from '../../../../../db-schema/postgres/constants/fitforge-values';
+import { HOME_EQUIPMENT_OPTIONS } from '../../../shared/constants/home-equipment';
 
 const ACTIVITY_LEVEL_INPUT = [
   'sedentary',

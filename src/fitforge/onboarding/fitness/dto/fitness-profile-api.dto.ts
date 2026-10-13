@@ -12,7 +12,7 @@ import {
   MaxLength,
   Min,
 } from 'class-validator';
-import { HOME_EQUIPMENT_OPTIONS } from '../../../../../db-schema/postgres/constants/fitforge-values';
+import { HOME_EQUIPMENT_OPTIONS } from '../../../shared/constants/home-equipment';
 import {
   FITNESS_API_ACTIVITY_LEVELS,
   FITNESS_API_DIET_TYPES,
