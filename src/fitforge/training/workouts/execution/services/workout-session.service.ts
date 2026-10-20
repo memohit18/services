@@ -188,6 +188,7 @@ export class WorkoutSessionService {
         name: exercise.exercise?.name ?? 'Exercise',
         muscleGroup: exercise.exercise?.muscleGroup ?? null,
         difficulty: exercise.exercise?.difficulty ?? null,
+        imageUrl: exercise.exercise?.imageUrl ?? null,
         sets: exercise.sets,
         targetSets: exercise.sets,
         reps: exercise.reps,

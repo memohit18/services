@@ -1,4 +1,12 @@
-import { Body, Controller, Get, Param, Post, Query } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Get,
+  Param,
+  Patch,
+  Post,
+  Query,
+} from '@nestjs/common';
 import {
   ApiBearerAuth,
   ApiOperation,
@@ -12,6 +20,7 @@ import { AiWorkoutPlanService } from '../../../ai/generation/ai-workout-plan.ser
 import { CreateWorkoutDayDto } from '../dto/create-workout-day.dto';
 import { CreateWorkoutExerciseDto } from '../dto/create-workout-exercise.dto';
 import { CreateWorkoutDto } from '../dto/create-workout.dto';
+import { UpdateExerciseDto } from '../dto/update-exercise.dto';
 import { WorkoutSessionService } from '../execution/services/workout-session.service';
 import { WorkoutsService } from '../services/workouts.service';
 
@@ -73,6 +82,38 @@ export class WorkoutsController {
     @Query() query: PaginationQueryDto,
   ) {
     return this.workoutsService.getHistory(user.userId, query);
+  }
+
+  @Get('exercises')
+  @ApiOperation({
+    summary: 'List exercise catalog (ExerciseMaster) including imageUrl',
+  })
+  listExercises() {
+    return this.workoutsService
+      .listExercises()
+      .then((data) => successResponse(data, 'Exercises retrieved'));
+  }
+
+  @Get('exercises/:exerciseId')
+  @ApiOperation({ summary: 'Get one exercise including imageUrl' })
+  getExercise(@Param('exerciseId') exerciseId: string) {
+    return this.workoutsService
+      .getExercise(exerciseId)
+      .then((data) => successResponse(data));
+  }
+
+  @Patch('exercises/:exerciseId')
+  @ApiOperation({
+    summary:
+      'Update exercise demo image/GIF URL (pass URL from POST /images type=workout)',
+  })
+  updateExercise(
+    @Param('exerciseId') exerciseId: string,
+    @Body() dto: UpdateExerciseDto,
+  ) {
+    return this.workoutsService
+      .updateExercise(exerciseId, dto)
+      .then((data) => successResponse(data, 'Exercise updated'));
   }
 
   @Get(':id')

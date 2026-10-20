@@ -237,6 +237,75 @@ export class WorkoutsService {
     return plan;
   }
 
+  async listExercises() {
+    return this.prisma.exerciseMaster.findMany({
+      orderBy: { name: 'asc' },
+      select: {
+        id: true,
+        name: true,
+        muscleGroup: true,
+        difficulty: true,
+        equipmentRequired: true,
+        caloriesBurnPerHour: true,
+        instructions: true,
+        imageUrl: true,
+        createdAt: true,
+      },
+    });
+  }
+
+  async getExercise(exerciseId: string) {
+    const exercise = await this.prisma.exerciseMaster.findUnique({
+      where: { id: exerciseId },
+      select: {
+        id: true,
+        name: true,
+        muscleGroup: true,
+        difficulty: true,
+        equipmentRequired: true,
+        caloriesBurnPerHour: true,
+        instructions: true,
+        imageUrl: true,
+        createdAt: true,
+      },
+    });
+    if (!exercise) {
+      throw new NotFoundException('Exercise not found');
+    }
+    return exercise;
+  }
+
+  async updateExercise(
+    exerciseId: string,
+    dto: { imageUrl?: string | null },
+  ) {
+    await this.getExercise(exerciseId);
+    return this.prisma.exerciseMaster.update({
+      where: { id: exerciseId },
+      data: {
+        ...(dto.imageUrl !== undefined
+          ? {
+              imageUrl:
+                dto.imageUrl === null || dto.imageUrl === ''
+                  ? null
+                  : dto.imageUrl.trim(),
+            }
+          : {}),
+      },
+      select: {
+        id: true,
+        name: true,
+        muscleGroup: true,
+        difficulty: true,
+        equipmentRequired: true,
+        caloriesBurnPerHour: true,
+        instructions: true,
+        imageUrl: true,
+        createdAt: true,
+      },
+    });
+  }
+
   private async ensureExercisesExist(exerciseIds: string[]) {
     const uniqueIds = [...new Set(exerciseIds)];
     const count = await this.prisma.exerciseMaster.count({
