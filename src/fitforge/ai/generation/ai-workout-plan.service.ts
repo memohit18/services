@@ -9,6 +9,23 @@ import {
 } from '../pipeline';
 import { AiContextService } from '../shared/ai-context.service';
 
+const WORKOUT_GIF_BASE = 'https://cdn.algoarena.co.in/catalog/workout-gifs/v2';
+
+/** Clips whose equipment must stay on the stable illustrated loop. */
+const LOCKED_MOVEMENT_GIFS: Record<string, string> = {
+  'seated cable rows':
+    'https://cdn.algoarena.co.in/catalog/workout-gifs/v8/seated-cable-rows.gif',
+};
+
+function movementGifUrl(name: string): string | null {
+  const key = name.trim().toLowerCase();
+  if (!key) return null;
+  const locked = LOCKED_MOVEMENT_GIFS[key];
+  if (locked) return locked;
+  const slug = key.replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
+  return slug ? `${WORKOUT_GIF_BASE}/${slug}.gif` : null;
+}
+
 type WorkoutPlanContext = {
   userId: string;
   profile: NonNullable<
@@ -26,6 +43,20 @@ export class AiWorkoutPlanService {
     private readonly contextService: AiContextService,
     private readonly pipeline: AiGenerationPipeline,
   ) {}
+
+  /** Fill catalog clips on the user's current workout. Existing clips are kept. */
+  async ensureMovementGifs(userId: string) {
+    const exercises = await this.prisma.exerciseMaster.findMany({
+      where: {
+        workoutExercises: {
+          some: { workoutDay: { workoutPlan: { userId } } },
+        },
+      },
+    });
+    for (const exercise of exercises) {
+      await this.withMovementGif(exercise);
+    }
+  }
 
   async generate(userId: string) {
     const { data } = await this.pipeline.runJson<
@@ -149,18 +180,33 @@ export class AiWorkoutPlanService {
       where: { name: { equals: name, mode: 'insensitive' } },
     });
     if (exact) {
-      return exact;
+      return this.withMovementGif(exact);
     }
 
-    const fuzzy = await this.prisma.exerciseMaster.findFirst({
-      where: { name: { contains: name, mode: 'insensitive' } },
+    const created = await this.prisma.exerciseMaster.create({
+      data: {
+        name,
+        equipmentRequired: true,
+        imageUrl: movementGifUrl(name),
+      },
     });
-    if (fuzzy) {
-      return fuzzy;
-    }
+    return created;
+  }
 
-    return this.prisma.exerciseMaster.create({
-      data: { name, equipmentRequired: true },
+  /** Keep an existing catalog clip. Fill a missing one with the same illustrated GIF. */
+  private async withMovementGif(exercise: {
+    id: string;
+    name: string;
+    imageUrl: string | null;
+  }) {
+    const url = movementGifUrl(exercise.name);
+    if (!url) return exercise;
+    const locked = exercise.name.trim().toLowerCase() in LOCKED_MOVEMENT_GIFS;
+    if (exercise.imageUrl && !locked) return exercise;
+    if (exercise.imageUrl === url) return exercise;
+    return this.prisma.exerciseMaster.update({
+      where: { id: exercise.id },
+      data: { imageUrl: url },
     });
   }
 }

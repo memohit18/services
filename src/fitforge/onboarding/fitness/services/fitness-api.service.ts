@@ -172,9 +172,36 @@ export class FitnessApiService {
     }
 
     try {
-      const workoutPlan = await this.aiWorkoutPlanService.generate(userId);
-      await this.workoutsService.activate(userId, workoutPlan.id);
-      this.logger.log(`Workout plan generated after onboarding for ${userId}`);
+      const activeWorkout = await this.prisma.workoutPlan.findFirst({
+        where: { userId, status: 'active' },
+        orderBy: { version: 'desc' },
+        select: { id: true },
+      });
+      if (activeWorkout) {
+        await this.aiWorkoutPlanService.ensureMovementGifs(userId);
+        this.logger.log(
+          `Mapped existing workout plan ${activeWorkout.id} for ${userId}`,
+        );
+      } else {
+        const latestWorkout = await this.prisma.workoutPlan.findFirst({
+          where: { userId },
+          orderBy: { version: 'desc' },
+          select: { id: true },
+        });
+        if (latestWorkout) {
+          await this.workoutsService.activate(userId, latestWorkout.id);
+          await this.aiWorkoutPlanService.ensureMovementGifs(userId);
+          this.logger.log(
+            `Mapped existing workout plan ${latestWorkout.id} for ${userId}`,
+          );
+        } else {
+          const workoutPlan = await this.aiWorkoutPlanService.generate(userId);
+          await this.workoutsService.activate(userId, workoutPlan.id);
+          this.logger.log(
+            `Workout plan generated after onboarding for ${userId}`,
+          );
+        }
+      }
     } catch (error) {
       this.logger.warn(
         `Workout generation after onboarding failed for ${userId}: ${String(error)}`,

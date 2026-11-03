@@ -118,14 +118,11 @@ export class FitnessProfileService {
     }
 
     await this.prisma.$transaction(async (tx) => {
-      await tx.workoutLog.deleteMany({ where: { userId } });
-      await tx.workoutSessionLog.deleteMany({ where: { userId } });
       await tx.dailyCheckin.deleteMany({ where: { userId } });
       await tx.mealLog.deleteMany({ where: { userId } });
       await tx.groceryList.deleteMany({ where: { userId } });
       await tx.mealPlan.deleteMany({ where: { userId } });
       await tx.dietPlan.deleteMany({ where: { userId } });
-      await tx.workoutPlan.deleteMany({ where: { userId } });
       await tx.transformationTarget.deleteMany({ where: { userId } });
       await tx.hydrationLog.deleteMany({ where: { userId } });
       await tx.progressLog.deleteMany({ where: { userId } });
