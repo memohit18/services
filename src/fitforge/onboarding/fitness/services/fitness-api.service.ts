@@ -150,6 +150,10 @@ export class FitnessApiService {
     return this.buildProfileResponse(userId, profile);
   }
 
+  async deleteProfile(userId: string) {
+    return this.fitnessProfileService.deleteByUserId(userId);
+  }
+
   private async finalizeOnboarding(userId: string) {
     await this.onboardingService.complete(userId);
     await this.transformationService.generate(userId);

@@ -49,7 +49,11 @@ export class WorkoutSessionService {
             workoutPlanId: day.workoutPlanId,
             exercises: day.exercises.map((e) => ({
               id: e.id,
+              exerciseId: e.exerciseId,
               name: e.exercise?.name ?? 'Exercise',
+              muscleGroup: e.exercise?.muscleGroup ?? null,
+              difficulty: e.exercise?.difficulty ?? null,
+              imageUrl: e.exercise?.imageUrl ?? null,
               sets: e.sets,
               reps: e.reps,
               restSeconds: e.restSeconds,

@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Post, Put } from '@nestjs/common';
+import { Body, Controller, Delete, Get, HttpCode, HttpStatus, Post, Put } from '@nestjs/common';
 import {
   ApiBearerAuth,
   ApiOperation,
@@ -53,6 +53,22 @@ export class FitnessProfileController {
     return this.fitnessProfileService
       .update(user.userId, dto)
       .then((data) => successResponse(data, 'Fitness profile updated'));
+  }
+
+  @Delete()
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({
+    summary:
+      'Delete fitness profile and related plans, logs, and preferences',
+  })
+  @ApiResponse({ status: 200 })
+  @ApiResponse({ status: 404, description: 'Profile not found' })
+  remove(@CurrentUser() user: CurrentUserPayload) {
+    return this.fitnessProfileService
+      .deleteByUserId(user.userId)
+      .then((data) =>
+        successResponse(data, 'Fitness profile and related data deleted'),
+      );
   }
 
   @Get('metrics')

@@ -4,7 +4,13 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
+import { InjectModel } from '@nestjs/mongoose';
 import type { UserFitnessProfile } from '@prisma/client';
+import { Model } from 'mongoose';
+import {
+  USER_IMAGE_MODEL,
+  type UserImageDocument,
+} from '../../../../../db-schema/mongodb/schemas/user-image.schema';
 import { ONBOARDING_STEPS } from '../../../../../db-schema/postgres/constants/fitforge-values';
 import { PrismaService } from '../../../../prisma/prisma.service';
 import {
@@ -27,6 +33,8 @@ export class FitnessProfileService {
     private readonly prisma: PrismaService,
     private readonly redis: RedisService,
     private readonly onboardingService: UserOnboardingService,
+    @InjectModel(USER_IMAGE_MODEL)
+    private readonly userImages: Model<UserImageDocument>,
   ) {}
 
   async create(userId: string, dto: CreateFitnessProfileDto) {
@@ -96,6 +104,58 @@ export class FitnessProfileService {
     await this.redis.del(FitForgeCacheKeys.fitnessProfile(userId));
     await this.redis.clearUserFitForgeCache(userId);
     return profile;
+  }
+
+  async deleteByUserId(userId: string) {
+    const existing = await this.prisma.userFitnessProfile.findUnique({
+      where: { userId },
+    });
+    if (!existing) {
+      throw new NotFoundException('Fitness profile not found');
+    }
+
+    await this.userImages.deleteMany({ userId }).exec();
+
+    await this.prisma.$transaction(async (tx) => {
+      await tx.workoutLog.deleteMany({ where: { userId } });
+      await tx.workoutSessionLog.deleteMany({ where: { userId } });
+      await tx.dailyCheckin.deleteMany({ where: { userId } });
+      await tx.mealLog.deleteMany({ where: { userId } });
+      await tx.groceryList.deleteMany({ where: { userId } });
+      await tx.mealPlan.deleteMany({ where: { userId } });
+      await tx.dietPlan.deleteMany({ where: { userId } });
+      await tx.workoutPlan.deleteMany({ where: { userId } });
+      await tx.transformationTarget.deleteMany({ where: { userId } });
+      await tx.hydrationLog.deleteMany({ where: { userId } });
+      await tx.progressLog.deleteMany({ where: { userId } });
+      await tx.progressPhoto.deleteMany({ where: { userId } });
+      await tx.userFoodPreference.deleteMany({ where: { userId } });
+      await tx.userNutritionPreference.deleteMany({ where: { userId } });
+      await tx.aiChatSession.deleteMany({ where: { userId } });
+      await tx.upload.deleteMany({ where: { userId } });
+      await tx.foodMaster.deleteMany({
+        where: {
+          createdByUserId: userId,
+          isCustom: true,
+          foodPreferences: { none: {} },
+          mealPlanItems: { none: {} },
+          mealLogsAsOriginal: { none: {} },
+          mealLogsAsReplacement: { none: {} },
+        },
+      });
+      await tx.userOnboarding.updateMany({
+        where: { userId },
+        data: {
+          currentStep: 1,
+          isCompleted: false,
+          completedAt: null,
+        },
+      });
+      await tx.userFitnessProfile.delete({ where: { userId } });
+    });
+
+    await this.redis.clearUserFitForgeCache(userId);
+    return { deleted: true };
   }
 
   async getMetrics(userId: string) {

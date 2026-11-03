@@ -1,6 +1,7 @@
 import {
   Body,
   Controller,
+  Delete,
   Get,
   HttpCode,
   HttpStatus,
@@ -140,6 +141,26 @@ export class FitnessController {
       .updateProfile(user.userId, dto)
       .then((data) =>
         successResponse(data, 'Fitness profile updated successfully'),
+      );
+  }
+
+  @Delete('profile')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({
+    summary:
+      'Delete the authenticated user fitness profile and related plans, logs, and preferences',
+  })
+  @ApiResponse({ status: 200 })
+  @ApiResponse({ status: 401, description: 'Unauthorized' })
+  @ApiResponse({ status: 404, description: 'Profile not found' })
+  deleteProfile(@CurrentUser() user: CurrentUserPayload) {
+    return this.fitnessApiService
+      .deleteProfile(user.userId)
+      .then((data) =>
+        successResponse(
+          data,
+          'Fitness profile and related data deleted successfully',
+        ),
       );
   }
 }
