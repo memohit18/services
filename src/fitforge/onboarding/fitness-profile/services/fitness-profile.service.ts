@@ -2,6 +2,7 @@ import {
   BadRequestException,
   ConflictException,
   Injectable,
+  Logger,
   NotFoundException,
 } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
@@ -29,6 +30,8 @@ import { UserOnboardingService } from '../../user-onboarding/services/user-onboa
 
 @Injectable()
 export class FitnessProfileService {
+  private readonly logger = new Logger(FitnessProfileService.name);
+
   constructor(
     private readonly prisma: PrismaService,
     private readonly redis: RedisService,
@@ -114,8 +117,6 @@ export class FitnessProfileService {
       throw new NotFoundException('Fitness profile not found');
     }
 
-    await this.userImages.deleteMany({ userId }).exec();
-
     await this.prisma.$transaction(async (tx) => {
       await tx.workoutLog.deleteMany({ where: { userId } });
       await tx.workoutSessionLog.deleteMany({ where: { userId } });
@@ -153,6 +154,15 @@ export class FitnessProfileService {
       });
       await tx.userFitnessProfile.delete({ where: { userId } });
     });
+
+    try {
+      await this.userImages.deleteMany({ userId }).exec();
+    } catch (error) {
+      this.logger.error(
+        `Fitness profile deleted for ${userId}, but stored images could not be removed`,
+        error instanceof Error ? error.stack : String(error),
+      );
+    }
 
     await this.redis.clearUserFitForgeCache(userId);
     return { deleted: true };
