@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { getPagination, PaginationQueryDto } from '../../../../common/dto/pagination-query.dto';
 import { paginatedResponse } from '../../../../common/utils/api-response';
 import { PrismaService } from '../../../../prisma/prisma.service';
@@ -10,6 +10,7 @@ import {
 import { CreateWorkoutDayDto } from '../dto/create-workout-day.dto';
 import { CreateWorkoutExerciseDto } from '../dto/create-workout-exercise.dto';
 import { CreateWorkoutDto } from '../dto/create-workout.dto';
+import { UpdateWorkoutPlanExerciseDto } from '../dto/update-workout-plan-exercise.dto';
 
 const workoutPlanInclude = {
   days: {
@@ -273,6 +274,49 @@ export class WorkoutsService {
       throw new NotFoundException('Exercise not found');
     }
     return exercise;
+  }
+
+  async updatePlanExercise(
+    userId: string,
+    itemId: string,
+    dto: UpdateWorkoutPlanExerciseDto,
+  ) {
+    if (
+      dto.sets === undefined &&
+      dto.reps === undefined &&
+      dto.restSeconds === undefined &&
+      dto.notes === undefined
+    ) {
+      throw new BadRequestException('Nothing to update');
+    }
+
+    const item = await this.prisma.workoutExercise.findFirst({
+      where: {
+        id: itemId,
+        workoutDay: { workoutPlan: { userId } },
+      },
+      select: { id: true },
+    });
+    if (!item) {
+      throw new NotFoundException('Workout exercise not found');
+    }
+
+    const updated = await this.prisma.workoutExercise.update({
+      where: { id: itemId },
+      data: {
+        ...(dto.sets !== undefined ? { sets: dto.sets } : {}),
+        ...(dto.reps !== undefined ? { reps: dto.reps.trim() } : {}),
+        ...(dto.restSeconds !== undefined ? { restSeconds: dto.restSeconds } : {}),
+        ...(dto.notes !== undefined ? { notes: dto.notes.trim() || null } : {}),
+      },
+      include: {
+        exercise: true,
+        workoutDay: { select: { id: true, dayNumber: true, title: true } },
+      },
+    });
+
+    await this.redis.del(FitForgeCacheKeys.activeWorkout(userId));
+    return updated;
   }
 
   async updateExercise(

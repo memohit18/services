@@ -21,6 +21,7 @@ import { CreateWorkoutDayDto } from '../dto/create-workout-day.dto';
 import { CreateWorkoutExerciseDto } from '../dto/create-workout-exercise.dto';
 import { CreateWorkoutDto } from '../dto/create-workout.dto';
 import { UpdateExerciseDto } from '../dto/update-exercise.dto';
+import { UpdateWorkoutPlanExerciseDto } from '../dto/update-workout-plan-exercise.dto';
 import { WorkoutSessionService } from '../execution/services/workout-session.service';
 import { WorkoutsService } from '../services/workouts.service';
 
@@ -114,6 +115,21 @@ export class WorkoutsController {
     return this.workoutsService
       .updateExercise(exerciseId, dto)
       .then((data) => successResponse(data, 'Exercise updated'));
+  }
+
+  @Patch('items/:itemId')
+  @ApiOperation({
+    summary:
+      'Update one exercise on the user’s plan (sets, reps, rest, notes)',
+  })
+  updatePlanExercise(
+    @CurrentUser() user: CurrentUserPayload,
+    @Param('itemId') itemId: string,
+    @Body() dto: UpdateWorkoutPlanExerciseDto,
+  ) {
+    return this.workoutsService
+      .updatePlanExercise(user.userId, itemId, dto)
+      .then((data) => successResponse(data, 'Workout exercise updated'));
   }
 
   @Get(':id')
